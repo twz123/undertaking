@@ -4,6 +4,22 @@ Undertaking
 A toolbox for Undertow/Rx/Guice.
 
 
+## Release process
+The shell script `release.sh` can be used to prepare a release. It performs
+the following steps:
+
+  * create a new branch for the release commits
+  * create a commit and a tag for the new release version
+  * verify that tag by invoking `./mvnw clean verify`
+  * increment to the next development version and commit it
+  * push the new branch to the remote repository
+  * TODO: automatically open a Pull Request
+
+After the pull request has been merged, the tag can be pushed:
+
+    git push origin <TAG_NAME>
+
+
 ## License
 
 The MIT License (MIT)
