@@ -12,11 +12,17 @@
 
     <name>Undertaking</name>
     <description>A toolbox for Undertow/Rx/Guice.</description>
+    <url>https://github.com/zalando-incubator/undertaking</url>
 
     <organization>
         <name>Zalando SE</name>
         <url>https://tech.zalando.com</url>
     </organization>
+
+    <scm>
+        <url>https://github.com/zalando-incubator/undertaking</url>
+        <connection>https://github.com/zalando-incubator/undertaking.git</connection>
+    </scm>
 
     <licenses>
         <license>
