@@ -1,6 +1,6 @@
 package org.zalando.undertaking.inject;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
@@ -46,7 +46,7 @@ public interface HttpExchangeScope {
      * @throws  NullPointerException  if {@code wrapped} is {@code null}
      */
     default HttpHandler scoped(final HttpHandler wrapped) {
-        checkNotNull(wrapped);
+        requireNonNull(wrapped);
         return exchange -> runScoped(exchange, () -> wrapped.handleRequest(exchange));
     }
 
@@ -60,7 +60,7 @@ public interface HttpExchangeScope {
      * @throws  NullPointerException  if {@code exchange} is {@code null}
      */
     default HttpExchangeScopedExecutor createExecutorFor(final HttpServerExchange exchange) {
-        checkNotNull(exchange);
+        requireNonNull(exchange);
         return new HttpExchangeScopedExecutor() {
             @Override
             public <X extends Throwable> void runScoped(final ScopedAction<X> action) throws X {
