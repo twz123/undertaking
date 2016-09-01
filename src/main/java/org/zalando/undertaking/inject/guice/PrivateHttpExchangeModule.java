@@ -16,7 +16,9 @@ import io.undertow.server.HttpServerExchange;
 
 import io.undertow.util.HeaderMap;
 
-// here go bindings that need the HttpServerExchange instance
+/**
+ * Here go bindings that need the HttpServerExchange instance.
+ */
 final class PrivateHttpExchangeModule extends PrivateModule {
 
     private final Iterable<? extends Consumer<? super PrivateBinder>> internalModules;
