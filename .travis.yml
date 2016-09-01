@@ -3,7 +3,7 @@ jdk:
   - oraclejdk8
 
 script:
-  - mvn clean verify
+  - ./mvnw clean verify
 
 # https://github.com/travis-ci/travis-ci/issues/3259
 addons:
