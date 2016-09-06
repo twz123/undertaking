@@ -70,7 +70,7 @@ public class AccessTokenProviderTest {
         underTest = new AccessTokenProvider(Single.defer(() -> requestCredentials), requestProvider, settings, clock);
     }
 
-    @Test(timeout = 12000)
+    @Test(timeout = 30000)
     public void automaticallyRefreshesAccessToken() {
         final PublishSubject<AccessTokenResponse> input = PublishSubject.create();
         final PublishSubject<Void> consumed = PublishSubject.create();
@@ -99,7 +99,7 @@ public class AccessTokenProviderTest {
         });
     }
 
-    @Test(timeout = 12000)
+    @Test(timeout = 30000)
     public void restartsThresholdProviderAfterSuccessfulRequest() {
         final AccessTokenResponse first = new AccessTokenResponse(AccessToken.of("first"), Instant.EPOCH);
         final AccessTokenResponse second = new AccessTokenResponse(AccessToken.of("second"),
