@@ -43,7 +43,7 @@ import io.undertow.util.StatusCodes;
 import rx.Observable;
 import rx.Single;
 
-class AccessTokenRequestProvider extends RequestProvider {
+class AccessTokenRequestProvider extends OAuth2RequestProvider {
 
     private static final class Payload {
         long expiresIn;
@@ -71,11 +71,11 @@ class AccessTokenRequestProvider extends RequestProvider {
 
     private BoundRequestBuilder createRequestBuilder(final RequestCredentials credentials) {
         return
-            client.preparePost(settings.getAccessTokenEndpoint().toString()) //
-                  .setRealm(createRealm(credentials.getClientCredentials())) //
-                  .setHeader(HttpHeaders.ACCEPT, "application/json")         //
-                  .addQueryParam("realm", "/services")                       //
-                  .setFormParams(createFormParams(credentials.getUserCredentials()));
+            httpClient.preparePost(settings.getAccessTokenEndpoint().toString()) //
+                      .setRealm(createRealm(credentials.getClientCredentials())) //
+                      .setHeader(HttpHeaders.ACCEPT, "application/json")         //
+                      .addQueryParam("realm", "/services")                       //
+                      .setFormParams(createFormParams(credentials.getUserCredentials()));
     }
 
     public Single<AccessTokenResponse> requestAccessToken(final RequestCredentials credentials) {
