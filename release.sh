@@ -194,6 +194,14 @@ determine_upstream_git_remote() {
   fi
 }
 
+# Triggers the download of the Maven wrapper.
+#
+# The download is executed using a Java program, which writes all its output
+# to stdout interfering with output from Maven itself.
+download_maven_wrapper() {
+  ./mvnw --version > /dev/null
+}
+
 
 determine_current_project_version() {
   printf "%s" "${C_YELLOW}Current project version: ${C_NORMAL}"
@@ -320,6 +328,7 @@ do_release() {
   ensure_working_copy_is_clean
   determine_git_base_branch
   determine_upstream_git_remote
+  download_maven_wrapper
   determine_current_project_version
   read_release_version
   read_next_dev_version
