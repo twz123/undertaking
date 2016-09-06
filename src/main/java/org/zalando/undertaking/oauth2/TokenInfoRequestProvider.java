@@ -28,7 +28,7 @@ import io.undertow.util.StatusCodes;
 
 import rx.Observable;
 
-class TokenInfoRequestProvider extends RequestProvider {
+class TokenInfoRequestProvider extends OAuth2RequestProvider {
 
     private static final class Payload {
         Set<String> scope;
@@ -63,9 +63,9 @@ class TokenInfoRequestProvider extends RequestProvider {
 
     private BoundRequestBuilder buildRequest(final AccessToken accessToken) {
         return
-            client.prepareGet(settings.getTokenInfoEndpoint().toString()) //
-                  .setHeader(HttpHeaders.ACCEPT, "application/json")      //
-                  .addQueryParam("access_token", accessToken.getValue());
+            httpClient.prepareGet(settings.getTokenInfoEndpoint().toString()) //
+                      .setHeader(HttpHeaders.ACCEPT, "application/json")      //
+                      .addQueryParam("access_token", accessToken.getValue());
     }
 
     Observable<AuthenticationInfo> construct(final BoundRequestBuilder requestBuilder) {
