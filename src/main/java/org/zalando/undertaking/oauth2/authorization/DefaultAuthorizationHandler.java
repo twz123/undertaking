@@ -15,10 +15,10 @@ import javax.inject.Provider;
 import org.zalando.undertaking.inject.HttpExchangeScope;
 import org.zalando.undertaking.oauth2.AuthenticationInfo;
 import org.zalando.undertaking.oauth2.AuthenticationInfoPredicate;
+import org.zalando.undertaking.oauth2.AuthenticationInfoSettings;
 import org.zalando.undertaking.oauth2.BadTokenInfoException;
 import org.zalando.undertaking.oauth2.MalformedAccessTokenException;
 import org.zalando.undertaking.oauth2.NoAccessTokenException;
-import org.zalando.undertaking.oauth2.OAuth2Settings;
 import org.zalando.undertaking.oauth2.TokenInfoRequestException;
 import org.zalando.undertaking.problem.ProblemHandlerBuilder;
 
@@ -70,17 +70,17 @@ public class DefaultAuthorizationHandler implements AuthorizationHandler {
     private final HttpExchangeScope scope;
     private final Provider<Single<AuthenticationInfo>> authInfoProvider;
     private final Provider<ProblemHandlerBuilder> problemBuilder;
-    private final OAuth2Settings oAuthSettings;
+    private final AuthenticationInfoSettings authInfoSettings;
 
     @Inject
     public DefaultAuthorizationHandler(final Settings settings, final HttpExchangeScope scope,
             final Provider<Single<AuthenticationInfo>> authInfoProvider,
-            final Provider<ProblemHandlerBuilder> problemBuilder, final OAuth2Settings oAuthSettings) {
+            final Provider<ProblemHandlerBuilder> problemBuilder, final AuthenticationInfoSettings authInfoSettings) {
         this.settings = requireNonNull(settings);
         this.scope = requireNonNull(scope);
         this.authInfoProvider = requireNonNull(authInfoProvider);
         this.problemBuilder = requireNonNull(problemBuilder);
-        this.oAuthSettings = requireNonNull(oAuthSettings);
+        this.authInfoSettings = requireNonNull(authInfoSettings);
     }
 
     @Override
@@ -297,13 +297,13 @@ public class DefaultAuthorizationHandler implements AuthorizationHandler {
         @Override
         public Optional<String> getErrorDescription(final AuthenticationInfo authInfo) {
             return Optional.of(String.format("The request requires the scope [%s] to override a business partner.",
-                        oAuthSettings.getBusinessPartnerIdOverrideScope()));
+                        authInfoSettings.getBusinessPartnerIdOverrideScope()));
         }
 
         @Override
         public boolean test(final AuthenticationInfo authenticationInfo) {
-            return !requestHeaders.contains(oAuthSettings.getBusinessPartnerIdOverrideHeader())
-                    || authenticationInfo.getScopes().contains(oAuthSettings.getBusinessPartnerIdOverrideScope());
+            return !requestHeaders.contains(authInfoSettings.getBusinessPartnerIdOverrideHeader())
+                    || authenticationInfo.getScopes().contains(authInfoSettings.getBusinessPartnerIdOverrideScope());
         }
     }
 }

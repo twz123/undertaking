@@ -55,7 +55,7 @@ public class AccessTokenProviderTest {
     private AccessTokenRequestProvider requestProvider;
 
     @Mock
-    private OAuth2Settings settings;
+    private AccessTokenSettings settings;
 
     @Mock
     private Clock clock;

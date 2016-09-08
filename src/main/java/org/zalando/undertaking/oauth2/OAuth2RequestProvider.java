@@ -1,7 +1,5 @@
 package org.zalando.undertaking.oauth2;
 
-import static java.util.Objects.requireNonNull;
-
 import org.asynchttpclient.AsyncHttpClient;
 
 import org.zalando.undertaking.request.RequestProvider;
@@ -18,11 +16,8 @@ class OAuth2RequestProvider extends RequestProvider {
         protected String errorDescription;
     }
 
-    protected final OAuth2Settings settings;
-
-    public OAuth2RequestProvider(final AsyncHttpClient client, final OAuth2Settings settings) {
+    public OAuth2RequestProvider(final AsyncHttpClient client) {
         super(client);
-        this.settings = requireNonNull(settings);
     }
 
     protected <T> T parse(final String payload, final Class<T> clazz) {

@@ -63,9 +63,13 @@ class AccessTokenRequestProvider extends OAuth2RequestProvider {
 
     private final Clock clock;
 
+    private final AccessTokenSettings settings;
+
     @Inject
-    public AccessTokenRequestProvider(final OAuth2Settings settings, final AsyncHttpClient client, final Clock clock) {
-        super(client, settings);
+    public AccessTokenRequestProvider(final AccessTokenSettings settings, final AsyncHttpClient client,
+            final Clock clock) {
+        super(client);
+        this.settings = requireNonNull(settings);
         this.clock = requireNonNull(clock);
     }
 

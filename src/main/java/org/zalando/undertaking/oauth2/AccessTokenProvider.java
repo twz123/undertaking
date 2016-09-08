@@ -44,7 +44,7 @@ class AccessTokenProvider implements Provider<Single<AccessToken>> {
     /**
      * Facade to access OAuth2 configuration values.
      */
-    private final OAuth2Settings settings;
+    private final AccessTokenSettings settings;
 
     /**
      * Changes to the access token are published through this interface.
@@ -57,7 +57,7 @@ class AccessTokenProvider implements Provider<Single<AccessToken>> {
 
     @Inject
     AccessTokenProvider(final Single<RequestCredentials> credentials, final AccessTokenRequestProvider requestProvider,
-            final OAuth2Settings settings, final Clock clock) {
+            final AccessTokenSettings settings, final Clock clock) {
         this.credentials = requireNonNull(credentials);
         this.requestProvider = requireNonNull(requestProvider);
         this.settings = requireNonNull(settings);

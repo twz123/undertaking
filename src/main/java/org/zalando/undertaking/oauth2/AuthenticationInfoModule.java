@@ -11,7 +11,7 @@ import rx.Single;
 /**
  * Provides OAuth2 authentication info for HTTP requests.
  */
-final class AuthenticationInfoModule extends PrivateModule {
+public final class AuthenticationInfoModule extends PrivateModule {
 
     @Override
     protected void configure() {
