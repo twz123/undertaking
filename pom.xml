@@ -8,7 +8,7 @@
 
     <groupId>org.zalando.undertaking</groupId>
     <artifactId>undertaking</artifactId>
-    <version>0.0.3-SNAPSHOT</version>
+    <version>0.0.3</version>
 
     <name>Undertaking</name>
     <description>A toolbox for Undertow/Rx/Guice.</description>
