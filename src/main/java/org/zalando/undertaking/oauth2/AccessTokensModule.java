@@ -30,7 +30,7 @@ import rx.Single;
 /**
  * Provides the access token for accessing OAuth secured services.
  */
-class AccessTokensModule extends AbstractModule {
+public class AccessTokensModule extends AbstractModule {
 
     private static final Logger LOG = LoggerFactory.getLogger(AccessTokensModule.class);
 
