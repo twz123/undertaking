@@ -50,7 +50,7 @@ public class AccessTokensModuleTest {
     private CredentialsSettings credentialsSettings;
 
     @Mock
-    private OAuth2Settings oAuth2Settings;
+    private AccessTokenSettings accessTokenSettings;
 
     @Mock
     private AsyncHttpClient asyncHttpClient;
@@ -111,7 +111,7 @@ public class AccessTokensModuleTest {
                     protected void configure() {
                         bind(Clock.class).toInstance(Clock.systemUTC());
                         bind(CredentialsSettings.class).toInstance(credentialsSettings);
-                        bind(OAuth2Settings.class).toInstance(oAuth2Settings);
+                        bind(AccessTokenSettings.class).toInstance(accessTokenSettings);
                         bind(AsyncHttpClient.class).toInstance(asyncHttpClient);
                     }
                 }, underTest);

@@ -62,7 +62,7 @@ public class TokenInfoRequestProviderIT {
     private MockServerClient mockServerClient;
 
     @Mock
-    private OAuth2Settings settings;
+    private AuthenticationInfoSettings settings;
 
     private TokenInfoRequestProvider underTest;
 

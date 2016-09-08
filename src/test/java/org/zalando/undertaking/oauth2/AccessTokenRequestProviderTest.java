@@ -63,7 +63,7 @@ public class AccessTokenRequestProviderTest {
     public ExpectedException expected = ExpectedException.none();
 
     @Mock
-    private OAuth2Settings settings;
+    private AccessTokenSettings settings;
 
     @Mock
     private AsyncHttpClient client;

@@ -43,10 +43,13 @@ class TokenInfoRequestProvider extends OAuth2RequestProvider {
 
     private final HeaderMap requestHeaders;
 
+    private final AuthenticationInfoSettings settings;
+
     @Inject
-    public TokenInfoRequestProvider(final OAuth2Settings settings, final AsyncHttpClient client,
+    public TokenInfoRequestProvider(final AuthenticationInfoSettings settings, final AsyncHttpClient client,
             @Request final HeaderMap requestHeaders) {
-        super(client, settings);
+        super(client);
+        this.settings = requireNonNull(settings);
         this.requestHeaders = requireNonNull(requestHeaders);
     }
 
