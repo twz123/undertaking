@@ -51,15 +51,15 @@ class TokenInfoRequestProvider extends OAuth2RequestProvider {
         this.requestHeaders = requireNonNull(requestHeaders);
     }
 
-    public Observable<AuthenticationInfo> toObservable(final AccessToken accessToken) {
+    public HystrixObservableCommand<AuthenticationInfo> createCommand(final AccessToken accessToken) {
         final BoundRequestBuilder requestBuilder = buildRequest(accessToken);
 
         return new HystrixObservableCommand<AuthenticationInfo>(SETTER) {
-                @Override
-                protected Observable<AuthenticationInfo> construct() {
-                    return TokenInfoRequestProvider.this.construct(requestBuilder);
-                }
-            }.toObservable();
+            @Override
+            protected Observable<AuthenticationInfo> construct() {
+                return TokenInfoRequestProvider.this.construct(requestBuilder);
+            }
+        };
     }
 
     private BoundRequestBuilder buildRequest(final AccessToken accessToken) {
