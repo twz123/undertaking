@@ -103,8 +103,8 @@ public class TokenInfoRequestProviderIT {
                                         "uid", "testuser",                                                         //
                                         "scope", ImmutableSet.of("uid", "business_partner_override")))));
 
-        final AuthenticationInfo authInfo = underTest.toObservable(AccessToken.of(
-                    "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx")).toBlocking().first();
+        final AuthenticationInfo authInfo = underTest.createCommand(AccessToken.of(
+                    "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx")).toObservable().toBlocking().first();
 
         assertThat(authInfo, hasFeature(AuthenticationInfo::getBusinessPartnerId, hasValue("4711")));
     }
