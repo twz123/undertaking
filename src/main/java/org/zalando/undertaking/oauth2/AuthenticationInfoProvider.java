@@ -10,7 +10,6 @@ import javax.inject.Provider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.zalando.undertaking.inject.Request;
 import org.zalando.undertaking.utils.FixedAttemptsStrategy;
 
 import com.netflix.hystrix.exception.HystrixBadRequestException;
@@ -26,8 +25,7 @@ final class AuthenticationInfoProvider implements Provider<Single<Authentication
     private final TokenInfoRequestProvider requestProvider;
 
     @Inject
-    AuthenticationInfoProvider(@Request final Single<AccessToken> accessToken,
-            final TokenInfoRequestProvider requestProvider) {
+    AuthenticationInfoProvider(final Single<AccessToken> accessToken, final TokenInfoRequestProvider requestProvider) {
         this.accessToken = requireNonNull(accessToken);
         this.requestProvider = requireNonNull(requestProvider);
     }

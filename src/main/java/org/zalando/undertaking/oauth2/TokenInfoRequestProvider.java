@@ -11,7 +11,7 @@ import org.asynchttpclient.AsyncHttpClient;
 import org.asynchttpclient.BoundRequestBuilder;
 import org.asynchttpclient.Response;
 
-import org.asynchttpclient.extras.rxjava.AsyncHttpObservable;
+import org.asynchttpclient.extras.rxjava.single.AsyncHttpSingle;
 
 import org.zalando.undertaking.inject.Request;
 
@@ -19,7 +19,6 @@ import com.google.common.net.HttpHeaders;
 
 import com.netflix.hystrix.HystrixCommandGroupKey;
 import com.netflix.hystrix.HystrixCommandKey;
-import com.netflix.hystrix.HystrixCommandProperties;
 import com.netflix.hystrix.HystrixObservableCommand;
 import com.netflix.hystrix.exception.HystrixBadRequestException;
 
@@ -27,6 +26,7 @@ import io.undertow.util.HeaderMap;
 import io.undertow.util.StatusCodes;
 
 import rx.Observable;
+import rx.Single;
 
 class TokenInfoRequestProvider extends OAuth2RequestProvider {
 
@@ -37,8 +37,6 @@ class TokenInfoRequestProvider extends OAuth2RequestProvider {
 
     private static final HystrixObservableCommand.Setter SETTER =
         HystrixObservableCommand.Setter.withGroupKey(HystrixCommandGroupKey.Factory.asKey("auth")) //
-                                       .andCommandPropertiesDefaults(HystrixCommandProperties.Setter()
-                                               .withExecutionTimeoutInMilliseconds(10000))         //
                                        .andCommandKey(HystrixCommandKey.Factory.asKey("tokenInfo"));
 
     private final HeaderMap requestHeaders;
@@ -72,13 +70,15 @@ class TokenInfoRequestProvider extends OAuth2RequestProvider {
     }
 
     Observable<AuthenticationInfo> construct(final BoundRequestBuilder requestBuilder) {
-        return AsyncHttpObservable.observe(() -> requestBuilder)                         //
-                                  .onErrorResumeNext(TokenInfoRequestProvider::mapError) //
-                                  .map(this::parseResponse);
+        return
+            AsyncHttpSingle.create(requestBuilder)                                //
+                           .onErrorResumeNext(TokenInfoRequestProvider::mapError) //
+                           .map(this::parseResponse)                              //
+                           .toObservable();
     }
 
-    private static <T> Observable<T> mapError(final Throwable error) {
-        return Observable.error(new TokenInfoRequestException(error.getMessage(), error));
+    private static <T> Single<T> mapError(final Throwable error) {
+        return Single.error(new TokenInfoRequestException(error.getMessage(), error));
     }
 
     private AuthenticationInfo parseResponse(final Response response) {

@@ -6,7 +6,7 @@ import java.nio.charset.StandardCharsets;
 
 import com.google.common.hash.Hashing;
 
-public class AccessToken {
+public final class AccessToken {
 
     private final String value;
 
