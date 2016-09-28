@@ -6,10 +6,12 @@ import static org.hamcrest.Matchers.is;
 
 import static org.mockito.ArgumentMatchers.any;
 
+import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
-import static org.mockito.Mockito.when;
 
 import static org.zalando.undertaking.test.rx.hamcrest.TestSubscriberMatchers.hasOnlyError;
 import static org.zalando.undertaking.test.rx.hamcrest.TestSubscriberMatchers.hasOnlyValue;
@@ -27,6 +29,7 @@ import org.mockito.Mock;
 
 import org.mockito.runners.MockitoJUnitRunner;
 
+import com.netflix.hystrix.HystrixObservableCommand;
 import com.netflix.hystrix.exception.HystrixRuntimeException;
 
 import rx.Observable;
@@ -53,25 +56,38 @@ public class AuthenticationInfoProviderTest {
     }
 
     @Test
-    public void emitsAuthenticationInfo() {
+    public void callsEndpointOnlyOnce() {
         final AccessToken token = accessToken.toBlocking().value();
-        when(requestProvider.toObservable(token)).thenReturn(Observable.just(authenticationInfo));
+        doReturn(mockSuccess(authenticationInfo)).when(requestProvider).createCommand(any());
 
-        final TestSubscriber<AuthenticationInfo> subscriber = new TestSubscriber<>();
-        underTest.get().subscribe(subscriber);
+        final TestSubscriber<AuthenticationInfo> first = new TestSubscriber<>();
+        final Single<AuthenticationInfo> single = underTest.get();
+        single.subscribe(first);
 
-        subscriber.awaitTerminalEvent();
-        assertThat(subscriber, hasOnlyValue(is(authenticationInfo)));
+        first.awaitTerminalEvent();
+        assertThat(first, hasOnlyValue(is(authenticationInfo)));
 
-        verify(requestProvider).toObservable(token);
+        verify(requestProvider).createCommand(token);
+        verifyNoMoreInteractions(requestProvider);
+
+        final TestSubscriber<AuthenticationInfo> second = new TestSubscriber<>();
+        single.subscribe(second);
+
+        second.awaitTerminalEvent();
+        assertThat(second, hasOnlyValue(is(authenticationInfo)));
         verifyNoMoreInteractions(requestProvider);
     }
 
     @Test
     public void retriesTokenInfoCallOnCommandAndTimeoutExceptions() {
-        when(requestProvider.toObservable(any())).thenReturn(Observable.error(makeHystrixException(COMMAND_EXCEPTION)))
-                                                 .thenReturn(Observable.error(makeHystrixException(TIMEOUT)))
-                                                 .thenReturn(Observable.just(authenticationInfo));
+
+        //J-
+        doReturn(
+           mockError(makeHystrixException(COMMAND_EXCEPTION)),
+           mockError(makeHystrixException(TIMEOUT)),
+           mockSuccess(authenticationInfo)
+        ).when(requestProvider).createCommand(any());
+        //J+
 
         final TestSubscriber<AuthenticationInfo> subscriber = new TestSubscriber<>();
         underTest.get().subscribe(subscriber);
@@ -79,14 +95,14 @@ public class AuthenticationInfoProviderTest {
         subscriber.awaitTerminalEvent();
         assertThat(subscriber, hasOnlyValue(is(authenticationInfo)));
 
-        verify(requestProvider, times(3)).toObservable(any());
+        verify(requestProvider, times(3)).createCommand(any());
         verifyNoMoreInteractions(requestProvider);
     }
 
     @Test
     public void stopsRetryingAfterThreeAttempts() {
         final Throwable mockedFailure = makeHystrixException(COMMAND_EXCEPTION);
-        when(requestProvider.toObservable(any())).thenReturn(Observable.error(mockedFailure));
+        doReturn(mockError(mockedFailure)).when(requestProvider).createCommand(any());
 
         final TestSubscriber<AuthenticationInfo> subscriber = new TestSubscriber<>();
         underTest.get().subscribe(subscriber);
@@ -94,14 +110,14 @@ public class AuthenticationInfoProviderTest {
         subscriber.awaitTerminalEvent();
         assertThat(subscriber, hasOnlyError(is(mockedFailure)));
 
-        verify(requestProvider, times(3)).toObservable(any());
+        verify(requestProvider, times(3)).createCommand(any());
         verifyNoMoreInteractions(requestProvider);
     }
 
     @Test
     public void noRetriesForOtherExceptions() {
         final Throwable mockedFailure = makeHystrixException(REJECTED_SEMAPHORE_EXECUTION);
-        when(requestProvider.toObservable(any())).thenReturn(Observable.error(mockedFailure));
+        doReturn(mockError(mockedFailure)).when(requestProvider).createCommand(any());
 
         final TestSubscriber<AuthenticationInfo> subscriber = new TestSubscriber<>();
         underTest.get().subscribe(subscriber);
@@ -109,8 +125,22 @@ public class AuthenticationInfoProviderTest {
         subscriber.awaitTerminalEvent();
         assertThat(subscriber, hasOnlyError(is(mockedFailure)));
 
-        verify(requestProvider, times(1)).toObservable(any());
+        verify(requestProvider, times(1)).createCommand(any());
         verifyNoMoreInteractions(requestProvider);
+    }
+
+    private static <T> HystrixObservableCommand<T> mockSuccess(final T result) {
+        return mockCommand(Observable.just(result));
+    }
+
+    private static <T> HystrixObservableCommand<T> mockError(final Throwable error) {
+        return mockCommand(Observable.error(error));
+    }
+
+    private static <T> HystrixObservableCommand<T> mockCommand(final Observable<T> delegate) {
+        final HystrixObservableCommand<T> mock = mock(HystrixObservableCommand.class, RETURNS_DEEP_STUBS);
+        doReturn(delegate).when(mock).toObservable();
+        return mock;
     }
 
     private static Throwable makeHystrixException(final HystrixRuntimeException.FailureType type) {

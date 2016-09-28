@@ -14,7 +14,7 @@ public interface ProblemSetter<S extends ProblemSetter<S>> {
      *
      * @param   type  an absolute URI that identifies the problem type
      *
-     * @return  this problem setter*
+     * @return  this problem setter
      *
      * @throws  NullPointerException  if {@code type} is {@code null}
      */
@@ -62,6 +62,18 @@ public interface ProblemSetter<S extends ProblemSetter<S>> {
     default S setInstance(final String instance) {
         return setParameter("instance", instance);
     }
+
+    /**
+     * Sets an arbitrary numeric value.
+     *
+     * @param   name   parameter name
+     * @param   value  parameter value
+     *
+     * @return  this problem setter
+     *
+     * @throws  NullPointerException  if one of the parameters is {@code null}
+     */
+    S setParameter(String name, Number value);
 
     /**
      * Sets an arbitrary textual parameter.

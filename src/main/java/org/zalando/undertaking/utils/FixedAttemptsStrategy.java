@@ -2,12 +2,19 @@ package org.zalando.undertaking.utils;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
+import org.zalando.undertaking.hystrix.HystrixCommands;
+
 import com.netflix.hystrix.exception.HystrixRuntimeException;
 
 /**
  * Strategy, which attempts the action it is attached to for a configurable amount of times until it is evaluated as a
  * failure.
+ *
+ * @deprecated  Use
+ *              {@link HystrixCommands#withRetries(java.util.concurrent.Callable, int)  HystrixCommands.withRetries(…)}
+ *              instead.
  */
+@Deprecated
 public class FixedAttemptsStrategy {
 
     /**

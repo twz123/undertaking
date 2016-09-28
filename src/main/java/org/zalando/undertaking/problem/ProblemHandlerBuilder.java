@@ -7,6 +7,7 @@ import java.util.Optional;
 
 import javax.inject.Inject;
 
+import com.google.common.base.MoreObjects;
 import com.google.common.collect.ImmutableMap;
 
 import com.google.gson.Gson;
@@ -47,6 +48,21 @@ public class ProblemHandlerBuilder extends SimpleProblemSetter<ProblemHandlerBui
             this.statusCode = statusCode;
             this.problemData = ImmutableMap.copyOf(problemData);
             this.error = requireNonNull(error);
+        }
+
+        @Override
+        public String toString() {
+            final MoreObjects.ToStringHelper helper =
+                MoreObjects.toStringHelper("ProblemHandlerBuilder.Handler") //
+                           .addValue(statusCode)                            //
+                           .omitNullValues()                                //
+                           .add("error", error.orElse(null));
+
+            for (final Map.Entry<String, Object> entry : problemData.entrySet()) {
+                helper.add(entry.getKey(), entry.getValue());
+            }
+
+            return helper.toString();
         }
 
         @Override

@@ -15,6 +15,12 @@ abstract class SimpleProblemSetter<S extends ProblemSetter<S>> implements Proble
     private Optional<Throwable> error = Optional.empty();
 
     @Override
+    public S setParameter(final String name, final Number value) {
+        setParameterInternal(name, value);
+        return self();
+    }
+
+    @Override
     public S setParameter(final String name, final String value) {
         data.put(requireNonNull(name), requireNonNull(value));
         return self();
@@ -35,4 +41,8 @@ abstract class SimpleProblemSetter<S extends ProblemSetter<S>> implements Proble
     }
 
     protected abstract S self();
+
+    private void setParameterInternal(final String name, final Object value) {
+        data.put(requireNonNull(name), requireNonNull(value));
+    }
 }

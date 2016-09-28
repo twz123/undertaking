@@ -6,11 +6,15 @@ import java.time.Duration;
 
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
 import javax.inject.Inject;
 import javax.inject.Provider;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import org.zalando.undertaking.inject.HttpExchangeScope;
 import org.zalando.undertaking.oauth2.AuthenticationInfo;
@@ -32,16 +36,11 @@ import io.undertow.server.HttpServerExchange;
 
 import io.undertow.util.HeaderMap;
 import io.undertow.util.Headers;
+import io.undertow.util.SameThreadExecutor;
 import io.undertow.util.StatusCodes;
 
 import rx.Observable;
 import rx.Single;
-
-import rx.schedulers.Schedulers;
-
-import rx.subjects.AsyncSubject;
-
-import rx.subscriptions.CompositeSubscription;
 
 /**
  * Default implementation for OAuth2 based HTTP request authorization. Uses a {@link ProblemHandlerBuilder} to create
@@ -62,6 +61,8 @@ public class DefaultAuthorizationHandler implements AuthorizationHandler {
          */
         Duration getTimeout();
     }
+
+    private static final Logger LOG = LoggerFactory.getLogger(DefaultAuthorizationHandler.class);
 
     private static final String FORBIDDEN_ERROR_DESCRIPTION =
         "The request requires higher privileges than provided by the access token.";
@@ -88,98 +89,85 @@ public class DefaultAuthorizationHandler implements AuthorizationHandler {
         requireNonNull(predicate);
         requireNonNull(next);
 
-        return exchange -> require(exchange, predicate, Single.just(next));
+        final Observable<HttpHandler> nextEmitter = Observable.just(next);
+        return exchange -> handleRequest(exchange, predicate, nextEmitter);
     }
 
     @Override
     public HttpHandler require(final Predicate<? super AuthenticationInfo> predicate,
             final Function<? super HttpServerExchange, ? extends Single<HttpHandler>> nextProvider) {
-
         requireNonNull(predicate);
         requireNonNull(nextProvider);
 
-        return exchange -> {
-
-            // create an observable from the provider and subscribe on computation scheduler
-            final Single<HttpHandler> next =                            //
-                Single.fromCallable(() -> nextProvider.apply(exchange)) //
-                      .subscribeOn(Schedulers.computation())            //
-                      .flatMap(single -> single);
-
-            require(exchange, predicate, next);
-        };
+        return exchange ->
+                handleRequest(exchange, predicate, Observable.defer(() -> nextProvider.apply(exchange).toObservable()));
     }
 
-    private void require(final HttpServerExchange exchange, final Predicate<? super AuthenticationInfo> predicate,
-            final Single<HttpHandler> next) {
-        final Predicate<AuthenticationInfo> combined = new ContainsOverrideHeaderPredicate(exchange.getRequestHeaders())
-                .and(predicate);
+    private void handleRequest(final HttpServerExchange exchange, final Predicate<? super AuthenticationInfo> predicate,
+            final Observable<HttpHandler> nextEmitter) {
 
-        // Emits a HttpHandler if and only if the authz predicate rejected access to the resource, empty otherwise
-        final Single<Optional<HttpHandler>> authz = authInfoProvider.get().map(authInfo ->
-                    combined.test(authInfo) ? Optional.empty() : Optional.of(forbidden(authInfo, combined)));
+        final Predicate<AuthenticationInfo> authPredicate = //
+            new ContainsOverrideHeaderPredicate(exchange.getRequestHeaders()).and(predicate);
 
-        // Holder for the eager subscriptions to the underlying singles
-        final class EagerSubscriptions {
-            private final CompositeSubscription sub = new CompositeSubscription();
+        // HttpHandlers are supposed to set their own status codes.
+        // This is the last resort if something gets wrong.
+        exchange.setStatusCode(StatusCodes.INTERNAL_SERVER_ERROR);
 
-            final Observable<Optional<HttpHandler>> authzSubject = subscribe(sub, authz);
-            final Observable<HttpHandler> nextSubject = subscribe(sub, next);
+        final Observable<HttpHandler> authEmitter =                              //
+            authInfoProvider.get().toObservable()                                //
+                            .filter(authInfo -> !authPredicate.test(authInfo))   //
+                            .map(authInfo -> forbidden(authInfo, authPredicate)) //
+                            .onErrorResumeNext(error -> Observable.just(handleAuthError(error)));
 
-            void unsubscribe() {
-                sub.unsubscribe();
-            }
+        final Single<HttpHandler> handlerSingle =
+            Observable.concatEager(authEmitter, nextEmitter)                                //
+                      .take(1)                                                              //
+                      .toSingle()                                                           //
+                      .timeout(settings.getTimeout().toNanos(), TimeUnit.NANOSECONDS,
+                          Single.error(new TimeoutException("Timed out while authorizing request."))) //
+                      .onErrorResumeNext(error -> Single.just(internalServerError(error)));
 
-            private <T> Observable<T> subscribe(final CompositeSubscription sub, final Single<T> single) {
-                final AsyncSubject<T> subject = AsyncSubject.create();
-                sub.add(single.subscribe(subject));
-                return subject.asObservable();
-            }
+        final String requestId = LOG.isTraceEnabled() ? Integer.toHexString(exchange.hashCode()) : null;
+        if (requestId != null) {
+            LOG.trace("Dispatching request [{}].", requestId);
         }
 
-        final Single<HttpHandler> handlerSingle = Single.using(() -> new EagerSubscriptions(),
-                subscriptions ->
-                    subscriptions.authzSubject.flatMap(authzHandler -> {
-
-                        // if an error handler is present for authz, choose that
-                        if (authzHandler.isPresent()) {
-                            return Observable.just(authzHandler.get());
-                        }
-                        // no error handler for authz, continue with next handler
-                        else {
-                            return subscriptions.nextSubject;
-                        }
-                    }).toSingle(),
-                EagerSubscriptions::unsubscribe);
-
-        // Postpone subscription until call stack returns out of Connectors.executeRootHandler
-        exchange.dispatch(Runnable::run, () -> subscribe(handlerSingle, exchange));
+        exchange.dispatch(SameThreadExecutor.INSTANCE, () -> subscribe(requestId, handlerSingle, exchange));
     }
 
-    private void subscribe(final Single<HttpHandler> handlerSingle, final HttpServerExchange exchange) {
-        handlerSingle.timeout(settings.getTimeout().toNanos(), TimeUnit.NANOSECONDS).subscribe(
+    private void subscribe(final Object requestId, final Single<HttpHandler> handlerSingle,
+            final HttpServerExchange exchange) {
 
-            // handle the request using the emitted handler
-            handler ->
-                executeRootHandler(xc -> {
-                        try {
-                            handler.handleRequest(exchange);
-                        } catch (final Exception e) {
-                            exchange.unDispatch();
-                            handleError(e).handleRequest(exchange);
-                        }
-                    },
-                    exchange),
+        if (requestId != null) {
+            LOG.trace("Subscribing for request [{}].", requestId);
+        }
 
-            // or send an error
-            error -> executeRootHandler(handleError(error), exchange));
+        handlerSingle.subscribe( //
+            handler -> {
+                if (requestId != null) {
+                    LOG.trace("Executing for request [{}]: [{}]", requestId, handler);
+                }
+
+                Connectors.executeRootHandler(scope.scoped(handler), exchange);
+            },
+            error -> {
+                if (requestId != null) {
+                    LOG.trace("Fatal error occured while processing request [{}]: [{}]", requestId, error);
+                }
+
+                if (!exchange.isResponseStarted()) {
+                    exchange.setStatusCode(StatusCodes.INTERNAL_SERVER_ERROR);
+                }
+
+                exchange.endExchange();
+            });
+
+        if (requestId != null) {
+            LOG.trace("Subscribed for request [{}].", requestId);
+        }
     }
 
-    private void executeRootHandler(final HttpHandler handler, final HttpServerExchange exchange) {
-        Connectors.executeRootHandler(scope.scoped(handler), exchange);
-    }
-
-    private HttpHandler handleError(final Throwable e) {
+    private HttpHandler handleAuthError(final Throwable e) {
 
         if (e instanceof BadTokenInfoException) {
             final BadTokenInfoException btie = (BadTokenInfoException) e;
