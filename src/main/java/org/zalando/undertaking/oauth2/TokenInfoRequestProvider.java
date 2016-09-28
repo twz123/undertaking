@@ -100,7 +100,7 @@ class TokenInfoRequestProvider extends OAuth2RequestProvider {
                 if ("invalid_request".equals(errorPayload.error)
                         && "Access Token not valid".equals(errorPayload.errorDescription)) {
                     final BadTokenInfoException badTokenInfoException = //
-                        new BadTokenInfoException("invalid_token", "Access Token not valid.");
+                        new BadTokenInfoException("invalid_token", "Access Token not valid");
                     throw new HystrixBadRequestException(badTokenInfoException.getMessage(), badTokenInfoException);
                 }
 

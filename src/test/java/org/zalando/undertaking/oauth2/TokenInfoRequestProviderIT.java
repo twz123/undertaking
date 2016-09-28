@@ -2,6 +2,11 @@ package org.zalando.undertaking.oauth2;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 
+import static org.hamcrest.Matchers.allOf;
+import static org.hamcrest.Matchers.hasProperty;
+import static org.hamcrest.Matchers.instanceOf;
+import static org.hamcrest.Matchers.is;
+
 import static org.hobsoft.hamcrest.compose.ComposeMatchers.hasFeature;
 
 import static org.mockito.Mockito.when;
@@ -16,6 +21,8 @@ import static com.google.common.net.HttpHeaders.CONTENT_TYPE;
 import java.io.IOException;
 
 import java.net.URI;
+
+import java.util.Collections;
 
 import org.asynchttpclient.AsyncHttpClient;
 import org.asynchttpclient.DefaultAsyncHttpClient;
@@ -40,7 +47,6 @@ import org.mockserver.junit.MockServerRule;
 import org.mockserver.matchers.Times;
 
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
 
 import com.google.gson.Gson;
 
@@ -73,7 +79,6 @@ public class TokenInfoRequestProviderIT {
         when(settings.getTokenInfoEndpoint()).thenReturn(URI.create(
                 "http://localhost:" + serverRule.getPort() + "/tokeninfo"));
         when(settings.getBusinessPartnerIdOverrideHeader()).thenReturn("X-Business-Partner-Id");
-        when(settings.getBusinessPartnerIdOverrideScope()).thenReturn("business_partner_override");
 
         underTest = new TokenInfoRequestProvider(settings, httpClient, provideRequestHeaders());
     }
@@ -101,12 +106,38 @@ public class TokenInfoRequestProviderIT {
                             .withBody(new Gson().toJson(
                                     ImmutableMap.of(                                                               //
                                         "uid", "testuser",                                                         //
-                                        "scope", ImmutableSet.of("uid", "business_partner_override")))));
+                                        "scope", Collections.emptySet()))));
 
         final AuthenticationInfo authInfo = underTest.createCommand(AccessToken.of(
                     "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx")).toObservable().toBlocking().first();
 
         assertThat(authInfo, hasFeature(AuthenticationInfo::getBusinessPartnerId, hasValue("4711")));
+    }
+
+    @Test
+    public void handlesBadRequest() {
+        mockServerClient.when(
+                            request()                                             //
+                            .withMethod("GET")                                    //
+                            .withPath("/tokeninfo")                               //
+                            .withQueryStringParameter("access_token", "foo"),     //
+                            Times.once())                                         //
+                        .respond(
+                            response()                                            //
+                            .withStatusCode(StatusCodes.BAD_REQUEST)              //
+                            .withHeader(CONTENT_TYPE, "application/json;charset=UTF-8") //
+                            .withBody(new Gson().toJson(
+                                    ImmutableMap.of(                              //
+                                        "error", "invalid_request",               //
+                                        "error_description", "Access Token not valid"))));
+
+        expected.expectCause(allOf(                                                  //
+                instanceOf(BadTokenInfoException.class),                             //
+                hasProperty("error", is("invalid_token")),                           //
+                hasProperty("errorDescription", hasValue("Access Token not valid"))) //
+            );
+
+        underTest.createCommand(AccessToken.of("foo")).toObservable().toBlocking().first();
     }
 
     private static HeaderMap provideRequestHeaders() {
