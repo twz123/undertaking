@@ -8,6 +8,7 @@ import javax.inject.Inject;
 import javax.inject.Provider;
 
 import org.zalando.undertaking.hystrix.HystrixCommands;
+import org.zalando.undertaking.inject.Request;
 
 import rx.Single;
 import rx.SingleSubscriber;
@@ -20,7 +21,8 @@ final class AuthenticationInfoProvider implements Provider<Single<Authentication
     private final TokenInfoRequestProvider requestProvider;
 
     @Inject
-    AuthenticationInfoProvider(final Single<AccessToken> accessToken, final TokenInfoRequestProvider requestProvider) {
+    AuthenticationInfoProvider(@Request final Single<AccessToken> accessToken,
+            final TokenInfoRequestProvider requestProvider) {
         this.accessToken = requireNonNull(accessToken);
         this.requestProvider = requireNonNull(requestProvider);
     }
