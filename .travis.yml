@@ -7,9 +7,16 @@ sudo: false
 cache:
   directories:
     - $HOME/.m2
+    - /var/cache/oracle-jdk8-installer/
+
+before_script:
+  - pip install --user codecov
 
 script:
   - ./mvnw clean verify
+
+after_success:
+  - codecov
 
 # https://github.com/travis-ci/travis-ci/issues/3259
 addons:
