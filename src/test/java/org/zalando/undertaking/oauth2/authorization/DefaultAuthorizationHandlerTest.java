@@ -27,12 +27,15 @@ import org.mockito.runners.MockitoJUnitRunner;
 
 import org.zalando.undertaking.inject.HttpExchangeScope;
 import org.zalando.undertaking.oauth2.AuthenticationInfo;
-import org.zalando.undertaking.oauth2.AuthenticationInfoSettings;
 import org.zalando.undertaking.oauth2.authorization.DefaultAuthorizationHandler.Settings;
 import org.zalando.undertaking.problem.ProblemHandlerBuilder;
 
+import com.google.common.collect.ImmutableSet;
+
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
+
+import io.undertow.util.HttpString;
 
 import rx.Single;
 
@@ -51,9 +54,6 @@ public class DefaultAuthorizationHandlerTest {
     @Mock
     private Provider<ProblemHandlerBuilder> problemBuilder;
 
-    @Mock
-    private AuthenticationInfoSettings authInfoSettings;
-
     private DefaultAuthorizationHandler underTest;
 
     @Mock
@@ -71,8 +71,7 @@ public class DefaultAuthorizationHandlerTest {
         when(scope.scoped(any())).then(invocation -> invocation.getArgument(0));
         when(authInfoProvider.get()).thenReturn(Single.just(authInfo));
 
-        underTest = spy(new DefaultAuthorizationHandler(settings, scope, authInfoProvider, problemBuilder,
-                    authInfoSettings));
+        underTest = spy(new DefaultAuthorizationHandler(settings, scope, authInfoProvider, problemBuilder));
     }
 
     @Test
@@ -104,6 +103,81 @@ public class DefaultAuthorizationHandlerTest {
 
         final InOrder inOrder = inOrder(authPredicate, forbidden, next);
         inOrder.verify(authPredicate).test(authInfo);
+        inOrder.verify(forbidden).handleRequest(exchange);
+        inOrder.verifyNoMoreInteractions();
+    }
+
+    @Test
+    public void authorizesBusinessPartnerOverrides() throws Exception {
+        when(settings.getBusinessPartnerIdOverrideHeader()).thenReturn("BP-Override");
+        when(settings.getBusinessPartnerIdOverrideScope()).thenReturn("bp_override");
+
+        when(authInfo.getScopes()).thenReturn(ImmutableSet.of("bp_override"));
+        when(authPredicate.test(authInfo)).thenReturn(true);
+
+        final HttpServerExchange exchange = new HttpServerExchange(null);
+        exchange.getRequestHeaders().put(new HttpString("BP-Override"), "Someone Else");
+
+        doAnswer(invocation -> exchange.dispatch()).when(next).handleRequest(exchange);
+
+        underTest.require(authPredicate, next).handleRequest(exchange);
+
+        final InOrder inOrder = inOrder(authPredicate, next);
+        inOrder.verify(authPredicate).test(authInfo);
+        inOrder.verify(next).handleRequest(exchange);
+        inOrder.verifyNoMoreInteractions();
+    }
+
+    @Test
+    public void authorizesNonBusinessPartnerOverrides() throws Exception {
+        when(settings.getBusinessPartnerIdOverrideHeader()).thenReturn("BP-Override");
+        when(authPredicate.test(authInfo)).thenReturn(true);
+
+        final HttpServerExchange exchange = new HttpServerExchange(null);
+
+        doAnswer(invocation -> exchange.dispatch()).when(next).handleRequest(exchange);
+
+        underTest.require(authPredicate, next).handleRequest(exchange);
+
+        final InOrder inOrder = inOrder(authPredicate, next);
+        inOrder.verify(authPredicate).test(authInfo);
+        inOrder.verify(next).handleRequest(exchange);
+        inOrder.verifyNoMoreInteractions();
+    }
+
+    @Test
+    public void forbidsBusinessPartnerOverrideOnMissingScope() throws Exception {
+        when(settings.getBusinessPartnerIdOverrideHeader()).thenReturn("BP-Override");
+        when(settings.getBusinessPartnerIdOverrideScope()).thenReturn("bp_override");
+
+        final HttpServerExchange exchange = new HttpServerExchange(null);
+        exchange.getRequestHeaders().put(new HttpString("BP-Override"), "Someone Else");
+
+        final HttpHandler forbidden = mock(HttpHandler.class);
+        doAnswer(invocation -> exchange.dispatch()).when(forbidden).handleRequest(exchange);
+        doAnswer(invocation -> forbidden).when(underTest).forbidden(same(authInfo), any());
+
+        underTest.require(authPredicate, next).handleRequest(exchange);
+
+        final InOrder inOrder = inOrder(authPredicate, forbidden, next);
+        inOrder.verify(forbidden).handleRequest(exchange);
+        inOrder.verifyNoMoreInteractions();
+    }
+
+    @Test
+    public void forbidsBusinessPartnerOverrideIfConfiguredScopeIsNull() throws Exception {
+        when(settings.getBusinessPartnerIdOverrideHeader()).thenReturn("BP-Override");
+
+        final HttpServerExchange exchange = new HttpServerExchange(null);
+        exchange.getRequestHeaders().put(new HttpString("BP-Override"), "Someone Else");
+
+        final HttpHandler forbidden = mock(HttpHandler.class);
+        doAnswer(invocation -> exchange.dispatch()).when(forbidden).handleRequest(exchange);
+        doAnswer(invocation -> forbidden).when(underTest).forbidden(same(authInfo), any());
+
+        underTest.require(authPredicate, next).handleRequest(exchange);
+
+        final InOrder inOrder = inOrder(authPredicate, forbidden, next);
         inOrder.verify(forbidden).handleRequest(exchange);
         inOrder.verifyNoMoreInteractions();
     }

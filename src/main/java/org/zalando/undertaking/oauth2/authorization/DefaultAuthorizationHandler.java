@@ -48,7 +48,7 @@ import rx.Single;
  */
 public class DefaultAuthorizationHandler implements AuthorizationHandler {
 
-    public interface Settings {
+    public interface Settings extends AuthenticationInfoSettings {
 
         /**
          * The OAuth realm to be reported to clients in {@code WWW-Authenticate} headers.
@@ -71,17 +71,15 @@ public class DefaultAuthorizationHandler implements AuthorizationHandler {
     private final HttpExchangeScope scope;
     private final Provider<Single<AuthenticationInfo>> authInfoProvider;
     private final Provider<ProblemHandlerBuilder> problemBuilder;
-    private final AuthenticationInfoSettings authInfoSettings;
 
     @Inject
     public DefaultAuthorizationHandler(final Settings settings, final HttpExchangeScope scope,
             final Provider<Single<AuthenticationInfo>> authInfoProvider,
-            final Provider<ProblemHandlerBuilder> problemBuilder, final AuthenticationInfoSettings authInfoSettings) {
+            final Provider<ProblemHandlerBuilder> problemBuilder) {
         this.settings = requireNonNull(settings);
         this.scope = requireNonNull(scope);
         this.authInfoProvider = requireNonNull(authInfoProvider);
         this.problemBuilder = requireNonNull(problemBuilder);
-        this.authInfoSettings = requireNonNull(authInfoSettings);
     }
 
     @Override
@@ -106,8 +104,8 @@ public class DefaultAuthorizationHandler implements AuthorizationHandler {
     private void handleRequest(final HttpServerExchange exchange, final Predicate<? super AuthenticationInfo> predicate,
             final Observable<HttpHandler> nextEmitter) {
 
-        final Predicate<AuthenticationInfo> authPredicate = //
-            new ContainsOverrideHeaderPredicate(exchange.getRequestHeaders()).and(predicate);
+        final Predicate<? super AuthenticationInfo> authPredicate = //
+            wrapBusinessPartnerOverride(predicate, exchange.getRequestHeaders());
 
         // HttpHandlers are supposed to set their own status codes.
         // This is the last resort if something gets wrong.
@@ -274,24 +272,38 @@ public class DefaultAuthorizationHandler implements AuthorizationHandler {
         return String.format("Bearer realm=\"%s\", error=\"%s\"", settings.getRealm(), error);
     }
 
-    class ContainsOverrideHeaderPredicate implements AuthenticationInfoPredicate {
+    private Predicate<? super AuthenticationInfo> wrapBusinessPartnerOverride(
+            final Predicate<? super AuthenticationInfo> predicate, final HeaderMap requestHeaders) {
 
-        private final HeaderMap requestHeaders;
+        final String overrideHeader = settings.getBusinessPartnerIdOverrideHeader();
+        if (overrideHeader == null || !requestHeaders.contains(overrideHeader)) {
+            return predicate;
+        }
 
-        public ContainsOverrideHeaderPredicate(final HeaderMap requestHeaders) {
-            this.requestHeaders = requireNonNull(requestHeaders);
+        final String overrideScope = settings.getBusinessPartnerIdOverrideScope();
+        return new BusinessPartnerOverridePredicate(overrideScope).and(predicate);
+    }
+
+    private static final class BusinessPartnerOverridePredicate implements AuthenticationInfoPredicate {
+        private static final Optional<String> ERROR_DESC = Optional.of(
+                "The request is not authorized to override the business partner.");
+
+        private final String requiredScope;
+
+        BusinessPartnerOverridePredicate(final String requiredScope) {
+            this.requiredScope = requiredScope;
+        }
+
+        @Override
+        public boolean test(final AuthenticationInfo authInfo) {
+
+            // if, for some reason, the required scope is null, reject all requests due to security considerations
+            return requiredScope != null && authInfo.getScopes().contains(requiredScope);
         }
 
         @Override
         public Optional<String> getErrorDescription(final AuthenticationInfo authInfo) {
-            return Optional.of(String.format("The request requires the scope [%s] to override a business partner.",
-                        authInfoSettings.getBusinessPartnerIdOverrideScope()));
-        }
-
-        @Override
-        public boolean test(final AuthenticationInfo authenticationInfo) {
-            return !requestHeaders.contains(authInfoSettings.getBusinessPartnerIdOverrideHeader())
-                    || authenticationInfo.getScopes().contains(authInfoSettings.getBusinessPartnerIdOverrideScope());
+            return ERROR_DESC;
         }
     }
 }
