@@ -5,6 +5,7 @@ import static java.util.Objects.requireNonNull;
 import java.util.Optional;
 import java.util.Set;
 
+import com.google.common.base.MoreObjects;
 import com.google.common.collect.ImmutableSet;
 
 public class AuthenticationInfo {
@@ -18,6 +19,17 @@ public class AuthenticationInfo {
         this.uid = requireNonNull(uid);
         this.scopes = ImmutableSet.copyOf(scopes);
         this.businessPartnerId = requireNonNull(businessPartnerId);
+    }
+
+    @Override
+    public String toString() {
+        return
+            MoreObjects.toStringHelper(this)                                     //
+                       .omitNullValues()                                         //
+                       .add("uid", uid.orElse(null))                             //
+                       .add("scopes", scopes)                                    //
+                       .add("businessPartnerId", businessPartnerId.orElse(null)) //
+                       .toString();
     }
 
     public Optional<String> getUid() {

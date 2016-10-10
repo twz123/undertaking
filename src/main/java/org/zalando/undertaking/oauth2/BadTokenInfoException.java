@@ -7,21 +7,22 @@ import com.google.common.base.MoreObjects;
 /**
  * Thrown to indicate a negative outcome of an access token info request.
  */
+@SuppressWarnings("serial")
 public final class BadTokenInfoException extends RuntimeException {
 
     private String error;
     private Optional<String> errorDescription;
 
-    BadTokenInfoException(final String error, final String errorDescription) {
+    public BadTokenInfoException(final String error, final String errorDescription) {
         this.error = MoreObjects.firstNonNull(error, "unknown");
         this.errorDescription = Optional.ofNullable(errorDescription);
     }
 
-    BadTokenInfoException(final Throwable cause) {
+    public BadTokenInfoException(final Throwable cause) {
         super(cause);
     }
 
-    BadTokenInfoException(final String message, final Throwable cause) {
+    public BadTokenInfoException(final String message, final Throwable cause) {
         super(message, cause);
     }
 
