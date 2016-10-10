@@ -95,19 +95,19 @@ public final class HystrixCommands {
 
                         case COMMAND_EXCEPTION :
                         case TIMEOUT :
-                            LOG.warn("Retrying [{}] after attempt [{}]: [{}]", failure.getCommandName(), attempt,
+                            LOG.info("Retrying [{}] after attempt [{}]: [{}]", failure.getCommandName(), attempt,
                                 firstNonNull(cause.getCause(), cause).toString());
                             return true;
                     }
                 }
             }
 
-            LOG.warn("Not retrying [{}] after attempt [{}]: [{}]", failure.getCommandName(), attempt,
+            LOG.debug("Not retrying [{}] after attempt [{}]: [{}]", failure.getCommandName(), attempt,
                 firstNonNull(cause.getCause(), cause).toString());
             return false;
         }
 
-        LOG.warn("Not retrying after attempt [{}]: [{}]", attempt, error.toString());
+        LOG.debug("Not retrying after attempt [{}]: [{}]", attempt, error.toString());
         return false;
     }
 
