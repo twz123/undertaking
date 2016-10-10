@@ -11,6 +11,10 @@ import com.google.common.base.MoreObjects;
 
 import rx.Single;
 
+/**
+ * Straight-forward implementation of {@code RxHttpClient} that uses an {@code AsyncHttpClient} instance to actually
+ * execute HTTP requests.
+ */
 final class SimpleRxHttpClient implements RxHttpClient {
 
     private final AsyncHttpClient ahc;
