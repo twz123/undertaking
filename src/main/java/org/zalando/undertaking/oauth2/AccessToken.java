@@ -86,9 +86,7 @@ public final class AccessToken {
 
         buf.append("AccessToken(");
 
-        if (type.isPresent()) {
-            buf.append(type.get()).append(' ');
-        }
+        type.ifPresent(type -> buf.append(type).append(' '));
 
         if (value == null) {
             buf.append("<null>");
