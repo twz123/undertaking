@@ -10,6 +10,8 @@ import javax.inject.Provider;
 import org.zalando.undertaking.hystrix.HystrixCommands;
 import org.zalando.undertaking.inject.Request;
 
+import io.undertow.util.HeaderMap;
+
 import rx.Single;
 import rx.SingleSubscriber;
 
@@ -18,19 +20,22 @@ import rx.subjects.AsyncSubject;
 public final class AuthenticationInfoProvider implements Provider<Single<AuthenticationInfo>> {
 
     private final Provider<Single<AccessToken>> accessTokenProvider;
+    private final Provider<HeaderMap> requestHeadersProvider;
     private final TokenInfoRequestProvider requestProvider;
 
     @Inject
     AuthenticationInfoProvider(@Request final Provider<Single<AccessToken>> accessTokenProvider,
-            final TokenInfoRequestProvider requestProvider) {
+            @Request final Provider<HeaderMap> requestHeadersProvider, final TokenInfoRequestProvider requestProvider) {
         this.accessTokenProvider = requireNonNull(accessTokenProvider);
+        this.requestHeadersProvider = requireNonNull(requestHeadersProvider);
         this.requestProvider = requireNonNull(requestProvider);
     }
 
     @Override
     public Single<AuthenticationInfo> get() {
+        final HeaderMap requestHeaders = requestHeadersProvider.get();
         final Single<AuthenticationInfo> source = accessTokenProvider.get().flatMap(token -> {
-                return HystrixCommands.withRetries(() -> requestProvider.createCommand(token), 3);
+                return HystrixCommands.withRetries(() -> requestProvider.createCommand(token, requestHeaders), 3);
             });
 
         return Single.create(new CachedSubscribe<>(source));

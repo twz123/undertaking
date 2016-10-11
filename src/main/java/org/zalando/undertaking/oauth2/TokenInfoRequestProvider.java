@@ -6,15 +6,12 @@ import java.util.Optional;
 import java.util.Set;
 
 import javax.inject.Inject;
-import javax.inject.Provider;
 
 import org.asynchttpclient.AsyncHttpClient;
 import org.asynchttpclient.BoundRequestBuilder;
 import org.asynchttpclient.Response;
 
 import org.asynchttpclient.extras.rxjava.single.AsyncHttpSingle;
-
-import org.zalando.undertaking.inject.Request;
 
 import com.google.common.net.HttpHeaders;
 
@@ -40,20 +37,16 @@ class TokenInfoRequestProvider extends OAuth2RequestProvider {
         HystrixObservableCommand.Setter.withGroupKey(HystrixCommandGroupKey.Factory.asKey("auth")) //
                                        .andCommandKey(HystrixCommandKey.Factory.asKey("tokenInfo"));
 
-    private final Provider<HeaderMap> requestHeadersProvider;
-
     private final AuthenticationInfoSettings settings;
 
     @Inject
-    public TokenInfoRequestProvider(final AuthenticationInfoSettings settings, final AsyncHttpClient client,
-            @Request final Provider<HeaderMap> requestHeadersProvider) {
+    public TokenInfoRequestProvider(final AuthenticationInfoSettings settings, final AsyncHttpClient client) {
         super(client);
         this.settings = requireNonNull(settings);
-        this.requestHeadersProvider = requireNonNull(requestHeadersProvider);
     }
 
-    public HystrixObservableCommand<AuthenticationInfo> createCommand(final AccessToken accessToken) {
-        final HeaderMap requestHeaders = requestHeadersProvider.get();
+    public HystrixObservableCommand<AuthenticationInfo> createCommand( //
+            final AccessToken accessToken, final HeaderMap requestHeaders) {
         final BoundRequestBuilder requestBuilder = buildRequest(accessToken);
 
         return new HystrixObservableCommand<AuthenticationInfo>(SETTER) {

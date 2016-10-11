@@ -28,13 +28,14 @@ import org.junit.Test;
 
 import org.junit.runner.RunWith;
 
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 
 import org.mockito.runners.MockitoJUnitRunner;
 
 import com.netflix.hystrix.HystrixObservableCommand;
 import com.netflix.hystrix.exception.HystrixRuntimeException;
+
+import io.undertow.util.HeaderMap;
 
 import rx.Observable;
 import rx.Single;
@@ -48,24 +49,31 @@ public class AuthenticationInfoProviderTest {
     private Provider<Single<AccessToken>> accessTokenProvider;
 
     @Mock
+    private Provider<HeaderMap> requestHeadersProvider;
+
+    @Mock
     private TokenInfoRequestProvider requestProvider;
 
     @Mock
     private AuthenticationInfo authenticationInfo;
 
-    @InjectMocks
     private AuthenticationInfoProvider underTest;
 
     private final AccessToken accessToken = AccessToken.of("token");
 
+    private final HeaderMap requestHeaders = new HeaderMap();
+
     @Before
     public void initializeTest() {
         when(accessTokenProvider.get()).thenReturn(Single.just(accessToken));
+        when(requestHeadersProvider.get()).thenReturn(requestHeaders);
+
+        underTest = new AuthenticationInfoProvider(accessTokenProvider, requestHeadersProvider, requestProvider);
     }
 
     @Test
     public void callsEndpointOnlyOnce() {
-        doReturn(mockSuccess(authenticationInfo)).when(requestProvider).createCommand(any());
+        doReturn(mockSuccess(authenticationInfo)).when(requestProvider).createCommand(any(), any());
 
         final TestSubscriber<AuthenticationInfo> first = new TestSubscriber<>();
         final Single<AuthenticationInfo> single = underTest.get();
@@ -74,7 +82,7 @@ public class AuthenticationInfoProviderTest {
         first.awaitTerminalEvent();
         assertThat(first, hasOnlyValue(is(authenticationInfo)));
 
-        verify(requestProvider).createCommand(accessToken);
+        verify(requestProvider).createCommand(accessToken, requestHeaders);
         verifyNoMoreInteractions(requestProvider);
 
         final TestSubscriber<AuthenticationInfo> second = new TestSubscriber<>();
@@ -93,7 +101,7 @@ public class AuthenticationInfoProviderTest {
            mockError(makeHystrixException(COMMAND_EXCEPTION)),
            mockError(makeHystrixException(TIMEOUT)),
            mockSuccess(authenticationInfo)
-        ).when(requestProvider).createCommand(any());
+        ).when(requestProvider).createCommand(any(), any());
         //J+
 
         final TestSubscriber<AuthenticationInfo> subscriber = new TestSubscriber<>();
@@ -102,14 +110,14 @@ public class AuthenticationInfoProviderTest {
         subscriber.awaitTerminalEvent();
         assertThat(subscriber, hasOnlyValue(is(authenticationInfo)));
 
-        verify(requestProvider, times(3)).createCommand(any());
+        verify(requestProvider, times(3)).createCommand(any(), any());
         verifyNoMoreInteractions(requestProvider);
     }
 
     @Test
     public void stopsRetryingAfterThreeAttempts() {
         final Throwable mockedFailure = makeHystrixException(COMMAND_EXCEPTION);
-        doReturn(mockError(mockedFailure)).when(requestProvider).createCommand(any());
+        doReturn(mockError(mockedFailure)).when(requestProvider).createCommand(any(), any());
 
         final TestSubscriber<AuthenticationInfo> subscriber = new TestSubscriber<>();
         underTest.get().subscribe(subscriber);
@@ -117,14 +125,14 @@ public class AuthenticationInfoProviderTest {
         subscriber.awaitTerminalEvent();
         assertThat(subscriber, hasOnlyError(is(mockedFailure)));
 
-        verify(requestProvider, times(3)).createCommand(any());
+        verify(requestProvider, times(3)).createCommand(any(), any());
         verifyNoMoreInteractions(requestProvider);
     }
 
     @Test
     public void noRetriesForOtherExceptions() {
         final Throwable mockedFailure = makeHystrixException(REJECTED_SEMAPHORE_EXECUTION);
-        doReturn(mockError(mockedFailure)).when(requestProvider).createCommand(any());
+        doReturn(mockError(mockedFailure)).when(requestProvider).createCommand(any(), any());
 
         final TestSubscriber<AuthenticationInfo> subscriber = new TestSubscriber<>();
         underTest.get().subscribe(subscriber);
@@ -132,7 +140,7 @@ public class AuthenticationInfoProviderTest {
         subscriber.awaitTerminalEvent();
         assertThat(subscriber, hasOnlyError(is(mockedFailure)));
 
-        verify(requestProvider, times(1)).createCommand(any());
+        verify(requestProvider, times(1)).createCommand(any(), any());
         verifyNoMoreInteractions(requestProvider);
     }
 
