@@ -83,11 +83,14 @@ class TokenInfoRequestProvider extends OAuth2RequestProvider {
             case StatusCodes.OK :
 
                 final Payload payload = parse(response.getResponseBody(), Payload.class);
-                return new AuthenticationInfo(                                             //
-                        Optional.ofNullable(payload.uid),                                  //
-                        payload.scope,                                                     //
-                        Optional.ofNullable(settings.getBusinessPartnerIdOverrideHeader()) //
-                        .map(requestHeaders::getFirst));
+                return
+                    AuthenticationInfo.builder()                                           //
+                                      .uid(payload.uid)                                    //
+                                      .scopes(payload.scope)                               //
+                                      .businessPartnerId(
+                                          Optional.ofNullable(settings.getBusinessPartnerIdOverrideHeader()) //
+                                          .map(requestHeaders::getFirst).orElse(null))     //
+                                      .build();
 
             case StatusCodes.BAD_REQUEST :
             case StatusCodes.UNAUTHORIZED :
