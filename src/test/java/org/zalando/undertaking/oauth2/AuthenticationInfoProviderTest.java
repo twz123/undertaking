@@ -12,6 +12,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
 
 import static org.zalando.undertaking.test.rx.hamcrest.TestSubscriberMatchers.hasOnlyError;
 import static org.zalando.undertaking.test.rx.hamcrest.TestSubscriberMatchers.hasOnlyValue;
@@ -20,11 +21,14 @@ import static com.netflix.hystrix.exception.HystrixRuntimeException.FailureType.
 import static com.netflix.hystrix.exception.HystrixRuntimeException.FailureType.REJECTED_SEMAPHORE_EXECUTION;
 import static com.netflix.hystrix.exception.HystrixRuntimeException.FailureType.TIMEOUT;
 
+import javax.inject.Provider;
+
 import org.junit.Before;
 import org.junit.Test;
 
 import org.junit.runner.RunWith;
 
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 
 import org.mockito.runners.MockitoJUnitRunner;
@@ -40,7 +44,8 @@ import rx.observers.TestSubscriber;
 @RunWith(MockitoJUnitRunner.class)
 public class AuthenticationInfoProviderTest {
 
-    private final Single<AccessToken> accessToken = Single.just(AccessToken.of("token"));
+    @Mock
+    private Provider<Single<AccessToken>> accessTokenProvider;
 
     @Mock
     private TokenInfoRequestProvider requestProvider;
@@ -48,16 +53,18 @@ public class AuthenticationInfoProviderTest {
     @Mock
     private AuthenticationInfo authenticationInfo;
 
+    @InjectMocks
     private AuthenticationInfoProvider underTest;
+
+    private final AccessToken accessToken = AccessToken.of("token");
 
     @Before
     public void initializeTest() {
-        underTest = new AuthenticationInfoProvider(Single.defer(() -> accessToken), requestProvider);
+        when(accessTokenProvider.get()).thenReturn(Single.just(accessToken));
     }
 
     @Test
     public void callsEndpointOnlyOnce() {
-        final AccessToken token = accessToken.toBlocking().value();
         doReturn(mockSuccess(authenticationInfo)).when(requestProvider).createCommand(any());
 
         final TestSubscriber<AuthenticationInfo> first = new TestSubscriber<>();
@@ -67,7 +74,7 @@ public class AuthenticationInfoProviderTest {
         first.awaitTerminalEvent();
         assertThat(first, hasOnlyValue(is(authenticationInfo)));
 
-        verify(requestProvider).createCommand(token);
+        verify(requestProvider).createCommand(accessToken);
         verifyNoMoreInteractions(requestProvider);
 
         final TestSubscriber<AuthenticationInfo> second = new TestSubscriber<>();

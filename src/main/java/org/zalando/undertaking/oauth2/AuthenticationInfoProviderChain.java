@@ -2,6 +2,7 @@ package org.zalando.undertaking.oauth2;
 
 import java.util.List;
 
+import javax.inject.Inject;
 import javax.inject.Provider;
 
 import com.google.common.collect.ImmutableList;
@@ -22,6 +23,7 @@ public class AuthenticationInfoProviderChain implements Provider<Single<Authenti
 
     private final List<Provider<Single<AuthenticationInfo>>> providerChain;
 
+    @Inject
     public AuthenticationInfoProviderChain(final List<Provider<Single<AuthenticationInfo>>> providerChain) {
         this.providerChain = ImmutableList.copyOf(providerChain);
     }

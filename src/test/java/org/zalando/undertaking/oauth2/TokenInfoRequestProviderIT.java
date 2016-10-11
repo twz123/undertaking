@@ -80,7 +80,8 @@ public class TokenInfoRequestProviderIT {
                 "http://localhost:" + serverRule.getPort() + "/tokeninfo"));
         when(settings.getBusinessPartnerIdOverrideHeader()).thenReturn("X-Business-Partner-Id");
 
-        underTest = new TokenInfoRequestProvider(settings, httpClient, provideRequestHeaders());
+        underTest = new TokenInfoRequestProvider(settings, httpClient,
+                TokenInfoRequestProviderIT::provideRequestHeaders);
     }
 
     @After

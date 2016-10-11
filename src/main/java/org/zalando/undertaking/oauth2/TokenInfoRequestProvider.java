@@ -6,6 +6,7 @@ import java.util.Optional;
 import java.util.Set;
 
 import javax.inject.Inject;
+import javax.inject.Provider;
 
 import org.asynchttpclient.AsyncHttpClient;
 import org.asynchttpclient.BoundRequestBuilder;
@@ -39,25 +40,26 @@ class TokenInfoRequestProvider extends OAuth2RequestProvider {
         HystrixObservableCommand.Setter.withGroupKey(HystrixCommandGroupKey.Factory.asKey("auth")) //
                                        .andCommandKey(HystrixCommandKey.Factory.asKey("tokenInfo"));
 
-    private final HeaderMap requestHeaders;
+    private final Provider<HeaderMap> requestHeadersProvider;
 
     private final AuthenticationInfoSettings settings;
 
     @Inject
     public TokenInfoRequestProvider(final AuthenticationInfoSettings settings, final AsyncHttpClient client,
-            @Request final HeaderMap requestHeaders) {
+            @Request final Provider<HeaderMap> requestHeadersProvider) {
         super(client);
         this.settings = requireNonNull(settings);
-        this.requestHeaders = requireNonNull(requestHeaders);
+        this.requestHeadersProvider = requireNonNull(requestHeadersProvider);
     }
 
     public HystrixObservableCommand<AuthenticationInfo> createCommand(final AccessToken accessToken) {
+        final HeaderMap requestHeaders = requestHeadersProvider.get();
         final BoundRequestBuilder requestBuilder = buildRequest(accessToken);
 
         return new HystrixObservableCommand<AuthenticationInfo>(SETTER) {
             @Override
             protected Observable<AuthenticationInfo> construct() {
-                return TokenInfoRequestProvider.this.construct(requestBuilder);
+                return TokenInfoRequestProvider.this.construct(requestBuilder, requestHeaders);
             }
         };
     }
@@ -69,11 +71,11 @@ class TokenInfoRequestProvider extends OAuth2RequestProvider {
                       .addQueryParam("access_token", accessToken.getValue());
     }
 
-    Observable<AuthenticationInfo> construct(final BoundRequestBuilder requestBuilder) {
+    Observable<AuthenticationInfo> construct(final BoundRequestBuilder requestBuilder, final HeaderMap requestHeaders) {
         return
-            AsyncHttpSingle.create(requestBuilder)                                //
-                           .onErrorResumeNext(TokenInfoRequestProvider::mapError) //
-                           .map(this::parseResponse)                              //
+            AsyncHttpSingle.create(requestBuilder)                                   //
+                           .onErrorResumeNext(TokenInfoRequestProvider::mapError)    //
+                           .map(response -> parseResponse(response, requestHeaders)) //
                            .toObservable();
     }
 
@@ -81,7 +83,7 @@ class TokenInfoRequestProvider extends OAuth2RequestProvider {
         return Single.error(new TokenInfoRequestException(error.getMessage(), error));
     }
 
-    private AuthenticationInfo parseResponse(final Response response) {
+    private AuthenticationInfo parseResponse(final Response response, final HeaderMap requestHeaders) {
         final int statusCode = response.getStatusCode();
         switch (statusCode) {
 

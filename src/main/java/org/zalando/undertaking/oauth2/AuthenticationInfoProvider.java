@@ -15,21 +15,21 @@ import rx.SingleSubscriber;
 
 import rx.subjects.AsyncSubject;
 
-final class AuthenticationInfoProvider implements Provider<Single<AuthenticationInfo>> {
+public final class AuthenticationInfoProvider implements Provider<Single<AuthenticationInfo>> {
 
-    private final Single<AccessToken> accessToken;
+    private final Provider<Single<AccessToken>> accessTokenProvider;
     private final TokenInfoRequestProvider requestProvider;
 
     @Inject
-    AuthenticationInfoProvider(@Request final Single<AccessToken> accessToken,
+    AuthenticationInfoProvider(@Request final Provider<Single<AccessToken>> accessTokenProvider,
             final TokenInfoRequestProvider requestProvider) {
-        this.accessToken = requireNonNull(accessToken);
+        this.accessTokenProvider = requireNonNull(accessTokenProvider);
         this.requestProvider = requireNonNull(requestProvider);
     }
 
     @Override
     public Single<AuthenticationInfo> get() {
-        final Single<AuthenticationInfo> source = accessToken.flatMap(token -> {
+        final Single<AuthenticationInfo> source = accessTokenProvider.get().flatMap(token -> {
                 return HystrixCommands.withRetries(() -> requestProvider.createCommand(token), 3);
             });
 

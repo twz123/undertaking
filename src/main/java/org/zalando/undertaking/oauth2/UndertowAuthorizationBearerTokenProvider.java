@@ -16,7 +16,7 @@ import io.undertow.util.Headers;
 import rx.Observable;
 import rx.Single;
 
-final class UndertowAuthorizationBearerTokenProvider implements Provider<Single<AccessToken>> {
+public final class UndertowAuthorizationBearerTokenProvider implements Provider<Single<AccessToken>> {
 
     private static final String BEARER_PREFIX = "Bearer ";
 
