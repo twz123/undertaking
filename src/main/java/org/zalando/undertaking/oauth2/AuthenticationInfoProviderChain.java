@@ -31,7 +31,7 @@ public class AuthenticationInfoProviderChain implements Provider<Single<Authenti
     private final Observable<AuthenticationInfo> missingAuth = //
         Observable.defer(() ->
                 Observable.error(
-                    new BadTokenInfoException("Authentication failed.",
+                    new BadTokenInfoException("invalid_request",
                         "None of the authentication providers was able to authenticate the request.")));
 
     @Override
