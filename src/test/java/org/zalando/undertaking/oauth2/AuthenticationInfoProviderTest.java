@@ -59,7 +59,7 @@ public class AuthenticationInfoProviderTest {
 
     private AuthenticationInfoProvider underTest;
 
-    private final AccessToken accessToken = AccessToken.of("token");
+    private final AccessToken accessToken = AccessToken.bearer("token");
 
     private final HeaderMap requestHeaders = new HeaderMap();
 

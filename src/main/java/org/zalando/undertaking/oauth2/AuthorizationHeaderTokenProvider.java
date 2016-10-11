@@ -17,10 +17,7 @@ import rx.Single;
 
 public final class AuthorizationHeaderTokenProvider implements Provider<Single<AccessToken>> {
 
-    private static final String BEARER_PREFIX = "Bearer ";
-
     private static final Single<AccessToken> NO_TOKEN = Single.error(new NoAccessTokenException());
-    private static final Single<AccessToken> MALFORMED_TOKEN = Single.error(new MalformedAccessTokenException());
 
     private final HeaderMap requestHeaders;
 
@@ -32,13 +29,10 @@ public final class AuthorizationHeaderTokenProvider implements Provider<Single<A
     @Override
     public Single<AccessToken> get() {
         return
-            Optional.ofNullable(requestHeaders.get(Headers.AUTHORIZATION))                                 //
-                    .map(HeaderValues::peekFirst)                                                          //
-                    .map(value -> value.startsWith(BEARER_PREFIX) ? extractToken(value) : MALFORMED_TOKEN) //
+            Optional.ofNullable(requestHeaders.get(Headers.AUTHORIZATION)) //
+                    .map(HeaderValues::peekFirst)                          //
+                    .map(AccessToken::parse)                               //
+                    .map(Single::just)                                     //
                     .orElse(NO_TOKEN);
-    }
-
-    private static Single<AccessToken> extractToken(final String value) {
-        return Single.just(AccessToken.of(value.substring(BEARER_PREFIX.length())));
     }
 }

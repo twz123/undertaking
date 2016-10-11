@@ -149,7 +149,7 @@ class AccessTokenRequestProvider extends OAuth2RequestProvider {
     }
 
     private AccessTokenResponse buildResponse(final Payload payload, final Instant requestTime) {
-        return new AccessTokenResponse(AccessToken.of(payload.accessToken),
+        return new AccessTokenResponse(AccessToken.bearer(payload.accessToken),
                 requestTime.plus(payload.expiresIn, ChronoUnit.SECONDS));
     }
 
