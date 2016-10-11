@@ -19,6 +19,8 @@ import rx.subjects.AsyncSubject;
 
 public final class AuthenticationInfoProvider implements Provider<Single<AuthenticationInfo>> {
 
+    private static final Single<AuthenticationInfo> MALFORMED_TOKEN = Single.error(new MalformedAccessTokenException());
+
     private final Provider<Single<AccessToken>> accessTokenProvider;
     private final Provider<HeaderMap> requestHeadersProvider;
     private final TokenInfoRequestProvider requestProvider;
@@ -35,6 +37,11 @@ public final class AuthenticationInfoProvider implements Provider<Single<Authent
     public Single<AuthenticationInfo> get() {
         final HeaderMap requestHeaders = requestHeadersProvider.get();
         final Single<AuthenticationInfo> source = accessTokenProvider.get().flatMap(token -> {
+
+                if (!token.isOfType("Bearer")) {
+                    return MALFORMED_TOKEN;
+                }
+
                 return HystrixCommands.withRetries(() -> requestProvider.createCommand(token, requestHeaders), 3);
             });
 

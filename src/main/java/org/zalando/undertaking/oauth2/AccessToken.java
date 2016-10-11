@@ -62,6 +62,15 @@ public final class AccessToken {
         return new AccessToken(BEARER.get().equals(type) ? BEARER : Optional.of(type), value);
     }
 
+    public boolean hasType() {
+        return type.isPresent();
+    }
+
+    public boolean isOfType(final String type) {
+        requireNonNull(type);
+        return this.type.isPresent() && this.type.get().equals(type);
+    }
+
     public String getValue() {
         return value;
     }

@@ -75,6 +75,16 @@ public class AuthenticationInfoProviderChainTest {
     }
 
     @Test
+    public void emitsSecondIfFirstFailsWithMalformedToken() {
+        when(first.get()).thenReturn(Single.error(new MalformedAccessTokenException()));
+        when(second.get()).thenReturn(Single.just(secondInfo));
+
+        final TestSubscriber<AuthenticationInfo> subscriber = subscribeTo(underTest.get());
+        subscriber.assertNoErrors();
+        subscriber.assertValue(secondInfo);
+    }
+
+    @Test
     public void failsIfFirstFailsWithGenericException() {
         final RuntimeException expected = new RuntimeException();
         when(first.get()).thenReturn(Single.error(expected));

@@ -45,14 +45,15 @@ public class AuthenticationInfoProviderChain implements Provider<Single<Authenti
         final ImmutableList.Builder<Observable<AuthenticationInfo>> builder = ImmutableList.builder();
         for (final Provider<Single<AuthenticationInfo>> provider : providerChain) {
             builder.add(provider.get().toObservable() //
-                .onErrorResumeNext(AuthenticationInfoProviderChain::dropBadTokenExceptions));
+                .onErrorResumeNext(AuthenticationInfoProviderChain::dropBadOrMalformedTokenExceptions));
         }
 
         return builder.build();
     }
 
-    private static <T> Observable<T> dropBadTokenExceptions(final Throwable error) {
-        return error instanceof BadTokenInfoException ? Observable.empty() : Observable.error(error);
+    private static <T> Observable<T> dropBadOrMalformedTokenExceptions(final Throwable error) {
+        return (error instanceof BadTokenInfoException || error instanceof MalformedAccessTokenException)
+            ? Observable.empty() : Observable.error(error);
     }
 
     private static final class CachedSubscribe<T> implements Single.OnSubscribe<T> {
