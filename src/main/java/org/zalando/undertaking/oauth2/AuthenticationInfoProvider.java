@@ -10,27 +10,39 @@ import javax.inject.Provider;
 import org.zalando.undertaking.hystrix.HystrixCommands;
 import org.zalando.undertaking.inject.Request;
 
+import io.undertow.util.HeaderMap;
+
 import rx.Single;
 import rx.SingleSubscriber;
 
 import rx.subjects.AsyncSubject;
 
-final class AuthenticationInfoProvider implements Provider<Single<AuthenticationInfo>> {
+public final class AuthenticationInfoProvider implements Provider<Single<AuthenticationInfo>> {
 
-    private final Single<AccessToken> accessToken;
+    private static final Single<AuthenticationInfo> MALFORMED_TOKEN = Single.error(new MalformedAccessTokenException());
+
+    private final Provider<Single<AccessToken>> accessTokenProvider;
+    private final Provider<HeaderMap> requestHeadersProvider;
     private final TokenInfoRequestProvider requestProvider;
 
     @Inject
-    AuthenticationInfoProvider(@Request final Single<AccessToken> accessToken,
-            final TokenInfoRequestProvider requestProvider) {
-        this.accessToken = requireNonNull(accessToken);
+    AuthenticationInfoProvider(@Request final Provider<Single<AccessToken>> accessTokenProvider,
+            @Request final Provider<HeaderMap> requestHeadersProvider, final TokenInfoRequestProvider requestProvider) {
+        this.accessTokenProvider = requireNonNull(accessTokenProvider);
+        this.requestHeadersProvider = requireNonNull(requestHeadersProvider);
         this.requestProvider = requireNonNull(requestProvider);
     }
 
     @Override
     public Single<AuthenticationInfo> get() {
-        final Single<AuthenticationInfo> source = accessToken.flatMap(token -> {
-                return HystrixCommands.withRetries(() -> requestProvider.createCommand(token), 3);
+        final HeaderMap requestHeaders = requestHeadersProvider.get();
+        final Single<AuthenticationInfo> source = accessTokenProvider.get().flatMap(token -> {
+
+                if (!token.isOfType("Bearer")) {
+                    return MALFORMED_TOKEN;
+                }
+
+                return HystrixCommands.withRetries(() -> requestProvider.createCommand(token, requestHeaders), 3);
             });
 
         return Single.create(new CachedSubscribe<>(source));

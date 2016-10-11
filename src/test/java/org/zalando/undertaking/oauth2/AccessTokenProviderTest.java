@@ -89,13 +89,13 @@ public class AccessTokenProviderTest {
         final Single<AccessToken> single = underTest.get();
 
         doDuringAutoUpdate(() -> {
-            input.onNext(new AccessTokenResponse(AccessToken.of("first"), Instant.EPOCH));
+            input.onNext(new AccessTokenResponse(AccessToken.bearer("first"), Instant.EPOCH));
             consumed.take(1).toCompletable().await();
-            assertThat(single.toBlocking().value(), is(AccessToken.of("first")));
+            assertThat(single.toBlocking().value(), is(AccessToken.bearer("first")));
 
-            input.onNext(new AccessTokenResponse(AccessToken.of("second"), Instant.EPOCH.plus(1, DAYS)));
+            input.onNext(new AccessTokenResponse(AccessToken.bearer("second"), Instant.EPOCH.plus(1, DAYS)));
             consumed.take(1).toCompletable().await();
-            assertThat(single.toBlocking().value(), is(AccessToken.of("second")));
+            assertThat(single.toBlocking().value(), is(AccessToken.bearer("second")));
 
             verify(requestProvider, times(2)).requestAccessToken(credentials);
             verifyNoMoreInteractions(requestProvider);
@@ -104,8 +104,8 @@ public class AccessTokenProviderTest {
 
     @Test(timeout = 30000)
     public void restartsThresholdProviderAfterSuccessfulRequest() {
-        final AccessTokenResponse first = new AccessTokenResponse(AccessToken.of("first"), Instant.EPOCH);
-        final AccessTokenResponse second = new AccessTokenResponse(AccessToken.of("second"),
+        final AccessTokenResponse first = new AccessTokenResponse(AccessToken.bearer("first"), Instant.EPOCH);
+        final AccessTokenResponse second = new AccessTokenResponse(AccessToken.bearer("second"),
                 Instant.EPOCH.plus(1, DAYS));
 
         final AsyncSubject<Void> consumed = AsyncSubject.create();
@@ -122,10 +122,10 @@ public class AccessTokenProviderTest {
         final Single<AccessToken> single = underTest.get();
 
         doDuringAutoUpdate(() -> {
-            assertThat(single.toBlocking().value(), is(AccessToken.of("first")));
+            assertThat(single.toBlocking().value(), is(AccessToken.bearer("first")));
 
             consumed.toCompletable().await();
-            assertThat(single.toBlocking().value(), is(AccessToken.of("second")));
+            assertThat(single.toBlocking().value(), is(AccessToken.bearer("second")));
 
             verify(requestProvider, times(6)).requestAccessToken(any());
         });

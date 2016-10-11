@@ -78,7 +78,7 @@ public class AccessTokensModule extends AbstractModule {
                 final Iterator<String> splitter = tokenSplitter.split(token).iterator();
                 final String name = CharMatcher.WHITESPACE.trimFrom(Iterators.getNext(splitter, ""));
                 final String value = CharMatcher.WHITESPACE.trimFrom(Iterators.getNext(splitter, ""));
-                return Maps.immutableEntry(name, AccessToken.of(value));
+                return Maps.immutableEntry(name, AccessToken.bearer(value));
             });
     }
 

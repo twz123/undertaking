@@ -30,8 +30,6 @@ import org.zalando.undertaking.oauth2.AuthenticationInfo;
 import org.zalando.undertaking.oauth2.authorization.DefaultAuthorizationHandler.Settings;
 import org.zalando.undertaking.problem.ProblemHandlerBuilder;
 
-import com.google.common.collect.ImmutableSet;
-
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
 
@@ -57,19 +55,18 @@ public class DefaultAuthorizationHandlerTest {
     private DefaultAuthorizationHandler underTest;
 
     @Mock
-    private AuthenticationInfo authInfo;
-
-    @Mock
     private Predicate<AuthenticationInfo> authPredicate;
 
     @Mock
     private HttpHandler next;
 
+    private AuthenticationInfo authInfo = AuthenticationInfo.builder().build();
+
     @Before
     public void initializeTest() {
         when(settings.getTimeout()).thenReturn(Duration.ofMinutes(1));
         when(scope.scoped(any())).then(invocation -> invocation.getArgument(0));
-        when(authInfoProvider.get()).thenReturn(Single.just(authInfo));
+        when(authInfoProvider.get()).thenReturn(Single.defer(() -> Single.just(authInfo)));
 
         underTest = spy(new DefaultAuthorizationHandler(settings, scope, authInfoProvider, problemBuilder));
     }
@@ -112,7 +109,7 @@ public class DefaultAuthorizationHandlerTest {
         when(settings.getBusinessPartnerIdOverrideHeader()).thenReturn("BP-Override");
         when(settings.getBusinessPartnerIdOverrideScope()).thenReturn("bp_override");
 
-        when(authInfo.getScopes()).thenReturn(ImmutableSet.of("bp_override"));
+        authInfo = authInfo.with().scopes("bp_override").build();
         when(authPredicate.test(authInfo)).thenReturn(true);
 
         final HttpServerExchange exchange = new HttpServerExchange(null);

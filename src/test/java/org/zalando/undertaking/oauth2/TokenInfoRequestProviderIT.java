@@ -80,7 +80,7 @@ public class TokenInfoRequestProviderIT {
                 "http://localhost:" + serverRule.getPort() + "/tokeninfo"));
         when(settings.getBusinessPartnerIdOverrideHeader()).thenReturn("X-Business-Partner-Id");
 
-        underTest = new TokenInfoRequestProvider(settings, httpClient, provideRequestHeaders());
+        underTest = new TokenInfoRequestProvider(settings, httpClient);
     }
 
     @After
@@ -108,8 +108,9 @@ public class TokenInfoRequestProviderIT {
                                         "uid", "testuser",                                                         //
                                         "scope", Collections.emptySet()))));
 
-        final AuthenticationInfo authInfo = underTest.createCommand(AccessToken.of(
-                    "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx")).toObservable().toBlocking().first();
+        final AuthenticationInfo authInfo = underTest.createCommand(AccessToken.bearer(
+                                                             "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"),
+                                                         provideRequestHeaders()).toObservable().toBlocking().first();
 
         assertThat(authInfo, hasFeature(AuthenticationInfo::getBusinessPartnerId, hasValue("4711")));
     }
@@ -137,7 +138,7 @@ public class TokenInfoRequestProviderIT {
                 hasProperty("errorDescription", hasValue("Access Token not valid"))) //
             );
 
-        underTest.createCommand(AccessToken.of("foo")).toObservable().toBlocking().first();
+        underTest.createCommand(AccessToken.bearer("foo"), provideRequestHeaders()).toObservable().toBlocking().first();
     }
 
     private static HeaderMap provideRequestHeaders() {

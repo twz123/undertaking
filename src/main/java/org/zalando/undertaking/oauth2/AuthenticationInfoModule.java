@@ -24,7 +24,7 @@ public final class AuthenticationInfoModule extends PrivateModule {
                 // capture generic type
             };
 
-        bind(accessToken).annotatedWith(Request.class).toProvider(UndertowAuthorizationBearerTokenProvider.class).in(
+        bind(accessToken).annotatedWith(Request.class).toProvider(AuthorizationHeaderTokenProvider.class).in(
             HttpExchangeScoped.class);
 
         bind(authenticationInfo).toProvider(AuthenticationInfoProvider.class).in(HttpExchangeScoped.class);
