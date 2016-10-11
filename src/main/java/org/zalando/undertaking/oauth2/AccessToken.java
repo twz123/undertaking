@@ -23,7 +23,7 @@ public final class AccessToken {
 
     private AccessToken(final Optional<String> type, final String value) {
         this.type = requireNonNull(type);
-        this.value = requireNonNull(value);
+        this.value = value;
     }
 
     public static AccessToken parse(final String value) {
