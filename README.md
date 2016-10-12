@@ -2,6 +2,7 @@ Undertaking
 ===========
 
 [![Build Status](https://travis-ci.org/zalando-incubator/undertaking.svg?branch=master)](https://travis-ci.org/zalando-incubator/undertaking)
+[![codecov.io](http://codecov.io/github/zalando-incubator/undertaking/coverage.svg?branch=master)](http://codecov.io/github/zalando-incubator/undertaking?branch=master)
 
 A toolbox for Undertow/Rx/Guice.
 
