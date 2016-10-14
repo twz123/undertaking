@@ -60,6 +60,21 @@ public final class RxExchange {
     }
 
     /**
+     * Creates a {@code HttpHandler} that dispatches {@code HttpServerExchanges} to the {@code HttpHandler} emitted by
+     * {@code handlerSingle}.
+     *
+     * @param   handlerSingle  the {@code Single} whose emitted {@code HttpHandler} will be used to handle requests
+     *
+     * @return  a {@code HttpHandler} that delegates request processing to another {@code HttpHandler} that is provided
+     *          in a reactive way
+     *
+     * @throws  NullPointerException  if {@code handlerSingle} is {@code null}
+     */
+    public static HttpHandler dispatchTo(final Single<HttpHandler> handlerSingle) {
+        return new RxDispatchingHttpHandler(handlerSingle);
+    }
+
+    /**
      * Reads the request body of {@code exchange} and emits it as a {@code String} when it has been fully read. The
      * string will be decoded according to the charset specified by the {@code Content-Type} HTTP request header. If
      * that header is absent or doesn't specify any charset,
@@ -161,6 +176,24 @@ public final class RxExchange {
             } finally {
                 nextListener.proceed();
             }
+        }
+    }
+
+    private static final class RxDispatchingHttpHandler implements HttpHandler {
+        private final Single<HttpHandler> handlerSingle;
+
+        RxDispatchingHttpHandler(final Single<HttpHandler> handlerSingle) {
+            this.handlerSingle = requireNonNull(handlerSingle);
+        }
+
+        @Override
+        public String toString() {
+            return "RxExchange.dispatchTo(" + handlerSingle + ')';
+        }
+
+        @Override
+        public void handleRequest(final HttpServerExchange exchange) {
+            dispatch(handlerSingle, exchange);
         }
     }
 
