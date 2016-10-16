@@ -23,15 +23,11 @@ public final class UndertowService {
 
     @PostConstruct
     void start() {
-        synchronized (server) {
-            server.start();
-        }
+        server.start();
     }
 
     @PreDestroy
     void stop() {
-        synchronized (server) {
-            server.stop();
-        }
+        server.stop();
     }
 }
