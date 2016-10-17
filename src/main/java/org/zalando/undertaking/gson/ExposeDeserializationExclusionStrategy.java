@@ -5,10 +5,11 @@ import com.google.gson.FieldAttributes;
 import com.google.gson.annotations.Expose;
 
 /**
- * Deserialization strategy for those who don't satisfied with default {@code excludeFieldsWithoutExposeAnnotation()}
- * strategy. Behaviour added by this strategy: the {@code @Expose} annotation is missing on the field it will be
- * deserialized. To suppress field deserialization use {@code @Expose(deserialize = false)}.
- * {@code .excludeFieldsWithoutExposeAnnotation()} will take priority over this class.
+ * Deserialization strategy for those who aren't satisfied with Gson's default
+ * {@code excludeFieldsWithoutExposeAnnotation()} strategy. Behaviour added by this strategy: if the {@code @Expose}
+ * annotation is missing on the field it will be deserialized. To suppress field deserialization use
+ * {@code @Expose(deserialize = false)}. {@code .excludeFieldsWithoutExposeAnnotation()} will take priority over this
+ * class.
  */
 public class ExposeDeserializationExclusionStrategy implements ExclusionStrategy {
 
