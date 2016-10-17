@@ -13,10 +13,13 @@ import static org.mockito.Mockito.when;
 
 import java.util.Arrays;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 
 import org.asynchttpclient.AsyncHandler;
 import org.asynchttpclient.AsyncHttpClient;
 import org.asynchttpclient.Dsl;
+import org.asynchttpclient.ListenableFuture;
 import org.asynchttpclient.Request;
 import org.asynchttpclient.Response;
 
@@ -53,7 +56,7 @@ public class SimpleRxHttpClientTest {
     public void initializeTest() {
         when(ahc.executeRequest(requestCaptor.capture(), handlerCaptor.capture())).then(invocation -> {
             final AsyncHandler<Object> argument = invocation.getArgument(1);
-            return CompletableFuture.completedFuture(argument.onCompleted());
+            return new CompletedFuture<>(argument.onCompleted());
         });
     }
 
@@ -80,5 +83,65 @@ public class SimpleRxHttpClientTest {
 
         assertThat(requestCaptor.getAllValues(), contains(request, request));
         assertThat(handlerCaptor.getAllValues(), contains(is(lastHandler), not(lastHandler)));
+    }
+
+    private static final class CompletedFuture<V> implements ListenableFuture<V> {
+
+        private final V value;
+
+        CompletedFuture(final V value) {
+            this.value = value;
+        }
+
+        @Override
+        public void done() {
+            // no-op
+        }
+
+        @Override
+        public void abort(final Throwable t) {
+            // no-op
+        }
+
+        @Override
+        public void touch() {
+            // no-op
+        }
+
+        @Override
+        public CompletableFuture<V> toCompletableFuture() {
+            return CompletableFuture.completedFuture(value);
+        }
+
+        @Override
+        public boolean cancel(final boolean mayInterruptIfRunning) {
+            return false;
+        }
+
+        @Override
+        public boolean isCancelled() {
+            return false;
+        }
+
+        @Override
+        public boolean isDone() {
+            return true;
+        }
+
+        @Override
+        public V get() {
+            return value;
+        }
+
+        @Override
+        public V get(final long timeout, final TimeUnit unit) {
+            return value;
+        }
+
+        @Override
+        public ListenableFuture<V> addListener(final Runnable listener, final Executor exec) {
+            exec.execute(listener);
+            return this;
+        }
     }
 }
