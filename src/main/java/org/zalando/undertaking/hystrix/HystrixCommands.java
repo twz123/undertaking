@@ -16,13 +16,12 @@ import com.netflix.hystrix.exception.HystrixBadRequestException;
 import com.netflix.hystrix.exception.HystrixRuntimeException;
 
 import rx.Observable;
-import rx.Single;
 
 public final class HystrixCommands {
 
     @SuppressWarnings("serial")
-    private static final class CommandFailedExcepion extends Exception {
-        CommandFailedExcepion(final HystrixInvokableInfo<?> info, final Throwable error) {
+    private static final class CommandFailedException extends Exception {
+        CommandFailedException(final HystrixInvokableInfo<?> info, final Throwable error) {
             super(info.getCommandGroup().name() + "." + info.getCommandKey().name(), error);
         }
 
@@ -34,24 +33,24 @@ public final class HystrixCommands {
     private static final Logger LOG = LoggerFactory.getLogger(HystrixCommands.class);
 
     /**
-     * Wraps a Hystrix guarded command into a {@code Single} that may be subscribed to multiple times and unwraps
+     * Wraps a Hystrix guarded command into an {@code Observable} that may be subscribed to multiple times and unwraps
      * Hystrix exceptions by propagating their cause.
      *
      * @param   commandFactory  source for the Hystrix command to be executed. Every Hystrix command may only be used
      *                          once, hence it's necessary to build a new command for each subscription.
-     * @param   maxAttempts     number of attempts until command failures are propagated
      *
      * @throws  NullPointerException  if {@code commandFactory} is {@code null}
      */
-    public static <T> Single<T> toSingle(final Callable<? extends HystrixObservable<T>> commandFactory) {
-        return Single.fromCallable(requireNonNull(commandFactory))          //
-                     .flatMap(command -> command.toObservable().toSingle()) //
-                     .onErrorResumeNext(error -> Single.error(unwrapHystrixExceptions(error)));
+    public static <T> Observable<T> tObservable(final Callable<? extends HystrixObservable<T>> commandFactory) {
+        return
+            Observable.fromCallable(requireNonNull(commandFactory)) //
+                      .flatMap(HystrixObservable::toObservable)     //
+                      .onErrorResumeNext(error -> Observable.error(unwrapHystrixExceptions(error)));
     }
 
     /**
-     * Wraps a Hystrix guarded command into a {@code Single} that directly retries the command if it has been terminated
-     * due to a {@link HystrixRuntimeException.FailureType#TIMEOUT timeout} or a
+     * Wraps a Hystrix guarded command into an {@code Observable} that directly retries the command if it has been
+     * terminated due to a {@link HystrixRuntimeException.FailureType#TIMEOUT timeout} or a
      * {@link HystrixRuntimeException.FailureType#COMMAND_EXCEPTION command exception}. Upon terminal failure, Hystrix
      * exceptions are automatically unwrapped and their cause is being propagated.
      *
@@ -62,30 +61,29 @@ public final class HystrixCommands {
      * @throws  NullPointerException      if {@code commandFactory} is {@code null}
      * @throws  IllegalArgumentException  if {@code maxAttempts} is non-positive
      */
-    public static <T, C extends HystrixObservable<T> & HystrixInvokableInfo<?>> Single<T> withRetries(
+    public static <T, C extends HystrixObservable<T> & HystrixInvokableInfo<?>> Observable<T> withRetries(
             final Callable<? extends C> commandFactory, final int maxAttempts) {
 
         requireNonNull(commandFactory);
         checkArgument(maxAttempts > 0, "maxAttempts must be positive: %s", maxAttempts);
 
         if (maxAttempts == 1) {
-            return toSingle(commandFactory);
+            return tObservable(commandFactory);
         }
 
-        return Observable.fromCallable(requireNonNull(commandFactory))                              //
+        return Observable.fromCallable(requireNonNull(commandFactory))
                          .flatMap(command ->
-                                 command.toObservable().onErrorResumeNext(error ->
-                                         Observable.error(new CommandFailedExcepion(command, error)))) //
-                         .retry((attempt, error) -> shouldBeRetried(error, maxAttempts, attempt))   //
+                             command.toObservable().onErrorResumeNext(error ->
+                                     Observable.error(new CommandFailedException(command, error))))
+                         .retry((attempt, error) -> shouldBeRetried(error, maxAttempts, attempt))
                          .onErrorResumeNext(error ->
-                                 Observable.error(unwrapHystrixExceptions(unwrapCommandFailedException(error)))) //
-                         .toSingle();
+                             Observable.error(unwrapHystrixExceptions(unwrapCommandFailedException(error))));
     }
 
     private static boolean shouldBeRetried(final Throwable error, final int maxAttempts, final int attempt) {
 
-        if (error instanceof CommandFailedExcepion) {
-            final CommandFailedExcepion failure = (CommandFailedExcepion) error;
+        if (error instanceof CommandFailedException) {
+            final CommandFailedException failure = (CommandFailedException) error;
 
             final Throwable cause = error.getCause();
 
@@ -117,7 +115,7 @@ public final class HystrixCommands {
     }
 
     private static Throwable unwrapCommandFailedException(final Throwable error) {
-        return error instanceof CommandFailedExcepion ? firstNonNull(error.getCause(), error) : error;
+        return error instanceof CommandFailedException ? firstNonNull(error.getCause(), error) : error;
     }
 
     private HystrixCommands() {
