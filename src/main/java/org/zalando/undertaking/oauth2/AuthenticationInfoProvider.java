@@ -42,7 +42,8 @@ public final class AuthenticationInfoProvider implements Provider<Single<Authent
                     return MALFORMED_TOKEN;
                 }
 
-                return HystrixCommands.withRetries(() -> requestProvider.createCommand(token, requestHeaders), 3);
+                return HystrixCommands.withRetries(() -> requestProvider.createCommand(token, requestHeaders), 3)
+                                      .toSingle();
             });
 
         return Single.create(new CachedSubscribe<>(source));
