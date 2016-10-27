@@ -43,7 +43,7 @@ public final class AuthenticationInfoProvider implements Provider<Single<Authent
                 }
 
                 return HystrixCommands.withRetries(() -> requestProvider.createCommand(token, requestHeaders), 3)
-                                      .toSingle();
+                        .toSingle();
             });
 
         return Single.create(new CachedSubscribe<>(source));

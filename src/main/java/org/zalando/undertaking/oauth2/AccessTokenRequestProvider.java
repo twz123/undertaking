@@ -158,7 +158,7 @@ class AccessTokenRequestProvider extends OAuth2RequestProvider {
                 new Param("grant_type", "password"),                                     //
                 new Param("username", credentials.getApplicationUsername()),             //
                 new Param("password", credentials.getApplicationPassword()),             //
-                new Param("scope", Joiner.on(',').join(settings.getAccessTokenScopes())) //
+                new Param("scope", Joiner.on(' ').join(settings.getAccessTokenScopes())) //
             );
     }
 

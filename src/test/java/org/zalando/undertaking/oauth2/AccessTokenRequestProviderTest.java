@@ -2,9 +2,13 @@ package org.zalando.undertaking.oauth2;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 
+import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasProperty;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.sameInstance;
+
+import static org.hobsoft.hamcrest.compose.ComposeMatchers.compose;
+import static org.hobsoft.hamcrest.compose.ComposeMatchers.hasFeatureValue;
 
 import static org.mockito.Answers.RETURNS_DEEP_STUBS;
 
@@ -40,7 +44,9 @@ import org.junit.rules.ExpectedException;
 
 import org.junit.runner.RunWith;
 
+import org.mockito.ArgumentCaptor;
 import org.mockito.ArgumentMatchers;
+import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
@@ -48,6 +54,8 @@ import org.mockito.Spy;
 import org.mockito.runners.MockitoJUnitRunner;
 
 import org.zalando.undertaking.oauth2.credentials.RequestCredentials;
+
+import com.google.common.collect.ImmutableSet;
 
 import com.netflix.hystrix.exception.HystrixRuntimeException;
 
@@ -85,6 +93,9 @@ public class AccessTokenRequestProviderTest {
 
     @Mock
     private Response response;
+
+    @Captor
+    private ArgumentCaptor<List<Param>> formParamCaptor;
 
     @Before
     public void initializeTest() {
@@ -251,6 +262,24 @@ public class AccessTokenRequestProviderTest {
 
         final RuntimeException error = new RuntimeException("Oh no!");
         assertThat(method.invoke(null, error), is(sameInstance(error)));
+    }
+
+    @Test
+    public void usesSpaceAsScopeSeparator() {
+        when(settings.getAccessTokenScopes()).thenReturn(ImmutableSet.of("scope1", "scope2"));
+
+        final TestSubscriber<AccessTokenResponse> subscriber = new TestSubscriber<>();
+
+        underTest.requestAccessToken(credentials).subscribe(subscriber);
+
+        subscriber.awaitTerminalEvent();
+
+        verify(requestBuilder).setFormParams(formParamCaptor.capture());
+
+        assertThat(formParamCaptor.getValue(),
+            hasItem(
+                compose("a scope form parameter", hasFeatureValue("with name", Param::getName, "scope")).and(
+                    hasFeatureValue("with value", Param::getValue, "scope1 scope2"))));
     }
 
     private AccessTokenResponse requestToken() {
