@@ -71,13 +71,12 @@ public final class HystrixCommands {
             return tObservable(commandFactory);
         }
 
-        return Observable.fromCallable(requireNonNull(commandFactory))
-                         .flatMap(command ->
-                             command.toObservable().onErrorResumeNext(error ->
-                                     Observable.error(new CommandFailedException(command, error))))
-                         .retry((attempt, error) -> shouldBeRetried(error, maxAttempts, attempt))
+        return Observable.fromCallable(requireNonNull(commandFactory)).flatMap(command ->
+                                 command.toObservable().onErrorResumeNext(error ->
+                                         Observable.error(new CommandFailedException(command, error))))
+                         .retry((attempt, error) -> shouldBeRetried(error, maxAttempts, attempt)) //
                          .onErrorResumeNext(error ->
-                             Observable.error(unwrapHystrixExceptions(unwrapCommandFailedException(error))));
+                                 Observable.error(unwrapHystrixExceptions(unwrapCommandFailedException(error))));
     }
 
     private static boolean shouldBeRetried(final Throwable error, final int maxAttempts, final int attempt) {
