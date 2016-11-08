@@ -38,6 +38,12 @@ public class LogbookHandler implements HttpHandler, ExchangeCompletionListener {
 
     private volatile HttpHandler next = ResponseCodeHandler.HANDLE_404;
 
+    /**
+     * Instantiates a new logbook handler.
+     *
+     * @param  logbook         the logbook instance
+     * @param  pathObfuscator  the path obfuscator, to be provided named <i>logbook.pathObfuscator</i> by a DI module.
+     */
     @Inject
     public LogbookHandler(final Logbook logbook,
             @Nullable
