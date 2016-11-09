@@ -20,7 +20,7 @@ import io.undertow.server.HttpServerExchange;
 public class UndertowHttpRequestTest {
 
     private final Function<String, String> obfuscator = path -> {
-        final Matcher matcher = Pattern.compile("(/gift-card-codes/)([^/]+)").matcher(path);
+        final Matcher matcher = Pattern.compile("(/secret-codes/)([^/]+)").matcher(path);
         if (matcher.find()) {
             final String code = matcher.group(2);
             final HashCode hashedCode = Hashing.sha1().hashString(code, StandardCharsets.UTF_8);
@@ -38,12 +38,12 @@ public class UndertowHttpRequestTest {
 
     @Test
     public void getRequestUri() {
-        final String giftCardCode = "1ZHL5DDN2QTKCCZ4";
-        httpServerExchange.setRequestURI(String.format("https://gift-card-codes/%s/redemptions", giftCardCode));
+        final String code = "confidential";
+        httpServerExchange.setRequestURI(String.format("https://secret-codes/%s/redemptions", code));
         assertThat(underTest.getRequestUri(),
             equalTo(
-                String.format("https://gift-card-codes/{sha1:%s}/redemptions",
-                    Hashing.sha1().hashString(giftCardCode, StandardCharsets.UTF_8))));
+                String.format("https://secret-codes/{sha1:%s}/redemptions",
+                    Hashing.sha1().hashString(code, StandardCharsets.UTF_8))));
 
     }
 }
