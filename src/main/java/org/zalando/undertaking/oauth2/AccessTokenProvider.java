@@ -8,6 +8,8 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 
+import java.util.concurrent.TimeUnit;
+
 import javax.inject.Inject;
 import javax.inject.Provider;
 
@@ -72,10 +74,18 @@ class AccessTokenProvider implements Provider<Single<AccessToken>> {
 
     @Override
     public Single<AccessToken> get() {
-        return
-            changes.take(1)                              //
-                   .toSingle()                           //
-                   .observeOn(Schedulers.computation()); // Used to move out of AsyncHttpClient thread
+        return Single.defer(() -> {
+                final AccessToken value = changes.getValue();
+                if (value != null) {
+                    return Single.just(value);
+                }
+
+                return
+                    changes.take(1)                  //
+                    .toSingle()                      //
+                    .observeOn(Schedulers.computation()) // Used to move out of AsyncHttpClient thread
+                    .timeout(1, TimeUnit.SECONDS);
+            });
     }
 
     private Single<AccessTokenResponse> update() {
