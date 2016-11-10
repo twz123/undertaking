@@ -21,6 +21,12 @@ the following steps:
 After the pull request has been merged, the tag can be pushed:
 
     git push origin <TAG_NAME>
+    
+## Specific instructions
+###  Usage of the LogbookHandler
+The LogbookHandler expects an obfuscation function of type `Function<String, String>` 
+to be injected with the name `logbook.pathObfuscator`. This function prevents confidential path parameters in the URI to be 
+logged as plain text.
 
 
 ## License
