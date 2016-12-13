@@ -21,6 +21,7 @@ import java.time.Clock;
 import java.time.Instant;
 
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import org.junit.Before;
 import org.junit.Ignore;
@@ -43,6 +44,7 @@ import rx.Subscription;
 import rx.functions.Action0;
 import rx.functions.Action1;
 
+import rx.functions.Func2;
 import rx.subjects.AsyncSubject;
 import rx.subjects.PublishSubject;
 
@@ -122,10 +124,11 @@ public class AccessTokenProviderTest {
         final Single<AccessToken> single = underTest.get();
 
         doDuringAutoUpdate(() -> {
-            assertThat(single.toBlocking().value(), is(AccessToken.bearer("first")));
+            Func2<Integer, Throwable, Boolean> ignoreTimeouts =  (count, error) -> error instanceof TimeoutException;
+            assertThat(single.retry(ignoreTimeouts).toBlocking().value(), is(AccessToken.bearer("first")));
 
             consumed.toCompletable().await();
-            assertThat(single.toBlocking().value(), is(AccessToken.bearer("second")));
+            assertThat(single.retry(ignoreTimeouts).toBlocking().value(), is(AccessToken.bearer("second")));
 
             verify(requestProvider, times(6)).requestAccessToken(any());
         });
