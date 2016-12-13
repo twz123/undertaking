@@ -41,7 +41,7 @@ public final class HystrixCommands {
      *
      * @throws  NullPointerException  if {@code commandFactory} is {@code null}
      */
-    public static <T> Observable<T> tObservable(final Callable<? extends HystrixObservable<T>> commandFactory) {
+    public static <T> Observable<T> toObservable(final Callable<? extends HystrixObservable<T>> commandFactory) {
         return
             Observable.fromCallable(requireNonNull(commandFactory)) //
                       .flatMap(HystrixObservable::toObservable)     //
@@ -68,7 +68,7 @@ public final class HystrixCommands {
         checkArgument(maxAttempts > 0, "maxAttempts must be positive: %s", maxAttempts);
 
         if (maxAttempts == 1) {
-            return tObservable(commandFactory);
+            return toObservable(commandFactory);
         }
 
         return Observable.fromCallable(requireNonNull(commandFactory)).flatMap(command ->
