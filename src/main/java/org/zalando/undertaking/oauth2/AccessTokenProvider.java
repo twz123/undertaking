@@ -13,22 +13,27 @@ import java.util.concurrent.TimeUnit;
 import javax.inject.Inject;
 import javax.inject.Provider;
 
+import org.reactivestreams.Publisher;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.zalando.undertaking.oauth2.credentials.RequestCredentials;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.Iterables;
 import com.google.common.primitives.Ints;
 
-import rx.Observable;
-import rx.Single;
-import rx.Subscription;
+import io.reactivex.Flowable;
+import io.reactivex.Observable;
+import io.reactivex.Single;
 
-import rx.schedulers.Schedulers;
+import io.reactivex.disposables.Disposable;
 
-import rx.subjects.BehaviorSubject;
+import io.reactivex.schedulers.Schedulers;
+
+import io.reactivex.subjects.BehaviorSubject;
 
 /**
  * Retrieves the current access token.
@@ -52,10 +57,8 @@ class AccessTokenProvider implements Provider<Single<AccessToken>> {
      * Changes to the access token are published through this interface.
      */
     private final BehaviorSubject<AccessToken> changes = BehaviorSubject.create();
-
-    private final Observable<?> autoUpdater;
-
     private final Clock clock;
+    private Observable<?> autoUpdater;
 
     @Inject
     AccessTokenProvider(final Single<RequestCredentials> credentials, final AccessTokenRequestProvider requestProvider,
@@ -64,12 +67,12 @@ class AccessTokenProvider implements Provider<Single<AccessToken>> {
         this.requestProvider = requireNonNull(requestProvider);
         this.settings = requireNonNull(settings);
         this.clock = requireNonNull(clock);
-
-        autoUpdater = Single.defer(() -> repeat(update())).toObservable().share();
     }
 
-    Subscription autoUpdate() {
-        return autoUpdater.subscribe();
+    Disposable autoUpdate() {
+        this.autoUpdater = Single.defer(() -> repeat(update())).toObservable().share();
+
+        return this.autoUpdater.subscribe();
     }
 
     @Override
@@ -81,37 +84,37 @@ class AccessTokenProvider implements Provider<Single<AccessToken>> {
                 }
 
                 return
-                    changes.take(1)                  //
-                    .toSingle()                      //
-                    .observeOn(Schedulers.computation()) // Used to move out of AsyncHttpClient thread
+                    changes.take(1)                                  //
+                    .singleOrError().observeOn(Schedulers.computation()) // Used to move out of AsyncHttpClient thread
                     .timeout(1, TimeUnit.SECONDS);
             });
     }
 
-    private Single<AccessTokenResponse> update() {
-        return credentials.flatMap(requestProvider::requestAccessToken)             //
-                          .doOnSubscribe(() -> LOG.info("Requesting access token")) //
+    @VisibleForTesting
+    Single<AccessTokenResponse> update() {
+        return credentials.flatMap(requestProvider::requestAccessToken)              //
+                          .doOnSubscribe((s) -> LOG.info("Requesting access token")) //
                           .doOnSuccess(response -> {
                               final AccessToken accessToken = response.getAccessToken();
                               LOG.info("Updating access token: {}", accessToken);
                               changes.onNext(accessToken);
-                          })                                                        //
+                          })                                                         //
                           .doOnError(e -> LOG.error("Unable to request access token: [{}]", e.getMessage(), e))
                           .retryWhen(this::scheduleRetries);
     }
 
-    private Observable<?> scheduleRetries(final Observable<?> retryer) {
-        final Observable<Integer> retryDelays = Observable.from( //
+    private Publisher<Object> scheduleRetries(final Flowable<?> retryer) {
+        final Flowable<Integer> retryDelays = Flowable.fromIterable( //
                 FluentIterable.from(Ints.asList(0, 1, 1, 5, 15, 30)).append(Iterables.cycle(60)));
 
         return retryer.zipWith(retryDelays, (error, delay) -> delay) //
                       .flatMap(delay -> {
                           if (delay > 0) {
                               LOG.info("Retrying access token request in [{}] seconds", delay);
-                              return Observable.timer(delay, SECONDS);
+                              return Flowable.timer(delay, SECONDS);
                           } else {
                               LOG.info("Retrying access token request");
-                              return Observable.just(0L);
+                              return Flowable.just(0L);
                           }
                       });
     }
@@ -121,7 +124,6 @@ class AccessTokenProvider implements Provider<Single<AccessToken>> {
         // https://github.com/ReactiveX/RxJava/issues/4155
 
         return single.flatMap(response -> {
-
                 final Instant expiryTime = response.getExpiryTime();
                 final Duration delay = calculateRefreshDelay(expiryTime);
 
@@ -130,7 +132,8 @@ class AccessTokenProvider implements Provider<Single<AccessToken>> {
 
                 // Don't optimize away the timer for non-positive delays, as this might result in stack overflows.
                 // We want the thread dispatch here.
-                return Observable.timer(delay.toNanos(), NANOSECONDS).toSingle().flatMap(timeout -> repeat(single));
+                return Observable.timer(delay.toNanos(), NANOSECONDS).singleOrError().flatMap(timeout ->
+                            repeat(single));
             });
     }
 

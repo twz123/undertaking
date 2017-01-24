@@ -4,23 +4,24 @@ import static java.util.Objects.requireNonNull;
 
 import static com.google.common.base.MoreObjects.firstNonNull;
 
-import static com.netflix.hystrix.exception.HystrixRuntimeException.FailureType.COMMAND_EXCEPTION;
+import static javaslang.API.*;
+
+import static javaslang.Predicates.instanceOf;
 
 import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 
 import java.util.List;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.function.Predicate;
 
 import javax.inject.Inject;
 
-import org.asynchttpclient.AsyncHttpClient;
-import org.asynchttpclient.BoundRequestBuilder;
-import org.asynchttpclient.Param;
-import org.asynchttpclient.Realm;
-import org.asynchttpclient.Response;
+import org.asynchttpclient.*;
 
-import org.asynchttpclient.extras.rxjava.single.AsyncHttpSingle;
+import org.asynchttpclient.extras.rxjava2.single.AsyncHttpSingle;
 
 import org.zalando.undertaking.oauth2.credentials.ClientCredentials;
 import org.zalando.undertaking.oauth2.credentials.RequestCredentials;
@@ -31,46 +32,43 @@ import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.net.HttpHeaders;
 
-import com.netflix.hystrix.HystrixCommandGroupKey;
-import com.netflix.hystrix.HystrixCommandKey;
-import com.netflix.hystrix.HystrixCommandProperties;
-import com.netflix.hystrix.HystrixObservableCommand;
-import com.netflix.hystrix.exception.HystrixBadRequestException;
-import com.netflix.hystrix.exception.HystrixRuntimeException;
+import io.github.robwin.circuitbreaker.CircuitBreaker;
+import io.github.robwin.circuitbreaker.CircuitBreakerConfig;
+import io.github.robwin.circuitbreaker.CircuitBreakerRegistry;
+import io.github.robwin.circuitbreaker.operator.CircuitBreakerOperator;
+
+import io.reactivex.Single;
+
+import io.reactivex.functions.BiPredicate;
 
 import io.undertow.util.StatusCodes;
 
-import rx.Observable;
-import rx.Single;
-
 class AccessTokenRequestProvider extends OAuth2RequestProvider {
 
-    private static final class Payload {
-        long expiresIn;
-        String tokenType;
-        String realm;
-        String scope;
-        String grantType;
-        String uid;
-        String accessToken;
-    }
-
-    private final HystrixObservableCommand.Setter hystrixSetter =
-        HystrixObservableCommand.Setter.withGroupKey(HystrixCommandGroupKey.Factory.asKey("auth")) //
-                                       .andCommandPropertiesDefaults(HystrixCommandProperties.Setter()
-                                               .withExecutionTimeoutInMilliseconds(10000))         //
-                                       .andCommandKey(HystrixCommandKey.Factory.asKey("accessToken"));
-
     private final Clock clock;
-
+    private final CircuitBreaker circuitBreaker;
     private final AccessTokenSettings settings;
 
     @Inject
     public AccessTokenRequestProvider(final AccessTokenSettings settings, final AsyncHttpClient client,
-            final Clock clock) {
+            final Clock clock, final CircuitBreakerRegistry circuitBreakerRegistry) {
         super(client);
         this.settings = requireNonNull(settings);
         this.clock = requireNonNull(clock);
+
+        CircuitBreakerConfig config =
+            CircuitBreakerConfig
+                .custom().recordFailure(e -> Match(e).of(
+                    Case(instanceOf(BadAccessTokenException.class), false),
+                    Case($(), true)))
+                .build();
+        this.circuitBreaker = circuitBreakerRegistry.circuitBreaker("auth/accessToken", config);
+    }
+
+    private static Realm createRealm(final ClientCredentials credentials) {
+        return new Realm.Builder(credentials.getClientId(), credentials.getClientSecret()).setUsePreemptiveAuth(true)
+                                                                                          .setScheme(
+                Realm.AuthScheme.BASIC).build();
     }
 
     private BoundRequestBuilder createRequestBuilder(final RequestCredentials credentials) {
@@ -85,28 +83,20 @@ class AccessTokenRequestProvider extends OAuth2RequestProvider {
     public Single<AccessTokenResponse> requestAccessToken(final RequestCredentials credentials) {
         final Single<Instant> requestTimeProvider = Single.fromCallable(clock::instant);
 
-        final Observable<AccessTokenResponse> requestObservable =                                              //
-            createRequest(createRequestBuilder(credentials)).map(AccessTokenRequestProvider.this::parsePayload)
-                                                            .zipWith(requestTimeProvider, this::buildResponse) //
-                                                            .toObservable();
-
-        return Single.defer(() -> createHystrixCommand(requestObservable).toObservable().toSingle()) //
-                     .onErrorResumeNext(error -> Single.error(unwrapHystrixException(error)));
+        return createRequest(createRequestBuilder(credentials))                                //
+                .map(AccessTokenRequestProvider.this::parsePayload)                            //
+                .zipWith(requestTimeProvider, this::buildResponse)                             //
+                .retry(maxRetriesOr(3,  e -> Match(e).of(                                      //
+                                Case(instanceOf(BadAccessTokenException.class), false),        //
+                                Case($(), true))))                                             //
+                .timeout(10_000, TimeUnit.MILLISECONDS, Single.error(new TimeoutException()))  //
+                .lift(CircuitBreakerOperator.of(circuitBreaker));                              //
     }
 
     @VisibleForTesting
     @SuppressWarnings("static-method")
     Single<Response> createRequest(final BoundRequestBuilder requestBuilder) {
         return AsyncHttpSingle.create(requestBuilder);
-    }
-
-    private <T> HystrixObservableCommand<T> createHystrixCommand(final Observable<T> requestObservable) {
-        return new HystrixObservableCommand<T>(hystrixSetter) {
-            @Override
-            protected Observable<T> construct() {
-                return requestObservable;
-            }
-        };
     }
 
     private Payload parsePayload(final Response response) {
@@ -130,18 +120,15 @@ class AccessTokenRequestProvider extends OAuth2RequestProvider {
             case StatusCodes.BAD_REQUEST :
             case StatusCodes.UNAUTHORIZED :
 
-                BadAccessTokenException cause;
                 final ErrorPayload errorPayload;
                 try {
                     errorPayload = parse(response.getResponseBody(), ErrorPayload.class);
-                    cause = new BadAccessTokenException(errorPayload == null ? null : errorPayload.error,
-                            errorPayload == null ? null : errorPayload.errorDescription);
-                } catch (final AccessTokenRequestException e) {
-                    cause = new BadAccessTokenException( //
-                            "HTTP status code " + statusCode, firstNonNull(e.getCause(), e));
-                }
 
-                throw new HystrixBadRequestException(cause.getMessage(), cause);
+                    throw new BadAccessTokenException(errorPayload == null ? null : errorPayload.error,
+                        errorPayload == null ? null : errorPayload.errorDescription);
+                } catch (final AccessTokenRequestException e) {
+                    throw new BadAccessTokenException("HTTP status code " + statusCode, firstNonNull(e.getCause(), e));
+                }
         }
 
         throw new AccessTokenRequestException("Unexpected status code: " + statusCode + ": "
@@ -154,29 +141,25 @@ class AccessTokenRequestProvider extends OAuth2RequestProvider {
     }
 
     private List<Param> createFormParams(final UserCredentials credentials) {
-        return ImmutableList.of(                                                         //
-                new Param("grant_type", "password"),                                     //
-                new Param("username", credentials.getApplicationUsername()),             //
-                new Param("password", credentials.getApplicationPassword()),             //
-                new Param("scope", Joiner.on(' ').join(settings.getAccessTokenScopes())) //
-            );
+        return ImmutableList.of(new Param("grant_type", "password"),
+                new Param("username", credentials.getApplicationUsername()),
+                new Param("password", credentials.getApplicationPassword()),
+                new Param("scope", Joiner.on(' ').join(settings.getAccessTokenScopes())));
     }
 
-    private static Realm createRealm(final ClientCredentials credentials) {
-        return
-            new Realm.Builder(credentials.getClientId(), credentials.getClientSecret()).setUsePreemptiveAuth(true) //
-                                                                                       .setScheme(
-                                                                                           Realm.AuthScheme.BASIC) //
-                                                                                       .build();
+    private BiPredicate<Integer, Throwable> maxRetriesOr(final int maxRetries, final Predicate<Throwable> pred) {
+        return (tries, ex) -> tries < maxRetries && pred.test(ex);
     }
 
-    private static Throwable unwrapHystrixException(final Throwable t) {
-        if (t instanceof HystrixBadRequestException
-                || (t instanceof HystrixRuntimeException
-                    && ((HystrixRuntimeException) t).getFailureType() == COMMAND_EXCEPTION)) {
-            return firstNonNull(t.getCause(), t);
-        }
+    private static final class Payload {
 
-        return t;
+        long expiresIn;
+        String tokenType;
+        String realm;
+        String scope;
+        String grantType;
+        String uid;
+        String accessToken;
     }
+
 }

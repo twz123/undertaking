@@ -5,9 +5,9 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Objects.requireNonNull;
 
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 
+import com.google.common.base.Objects;
 import com.google.common.base.Splitter;
 import com.google.common.base.Strings;
 import com.google.common.hash.Hashing;
@@ -98,21 +98,21 @@ public final class AccessToken {
     }
 
     @Override
-    public int hashCode() {
-        return Objects.hash(type, value);
-    }
-
-    @Override
-    public boolean equals(final Object obj) {
-        if (obj == this) {
+    public boolean equals(final Object o) {
+        if (this == o) {
             return true;
         }
 
-        if (obj instanceof AccessToken) {
-            final AccessToken other = (AccessToken) obj;
-            return type.equals(other.type) && Objects.equals(value, other.value);
+        if (o == null || getClass() != o.getClass()) {
+            return false;
         }
 
-        return false;
+        final AccessToken that = (AccessToken) o;
+        return Objects.equal(type, that.type) && Objects.equal(value, that.value);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hashCode(type, value);
     }
 }

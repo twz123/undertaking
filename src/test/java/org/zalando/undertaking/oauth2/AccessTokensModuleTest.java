@@ -41,7 +41,9 @@ import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 
-import rx.Single;
+import io.github.robwin.circuitbreaker.CircuitBreakerRegistry;
+
+import io.reactivex.Single;
 
 @RunWith(MockitoJUnitRunner.class)
 public class AccessTokensModuleTest {
@@ -82,7 +84,7 @@ public class AccessTokensModuleTest {
 
         final Injector injector = Guice.createInjector(underTest);
         final TokenCapture first = injector.getInstance(TokenCapture.class);
-        assertThat(first.captured.toBlocking().value().getValue(), is("b=c"));
+        assertThat(first.captured.blockingGet().getValue(), is("b=c"));
 
         final TokenCapture second = injector.getInstance(TokenCapture.class);
         assertThat(second, is(not(sameInstance(first))));
@@ -113,6 +115,7 @@ public class AccessTokensModuleTest {
                         bind(CredentialsSettings.class).toInstance(credentialsSettings);
                         bind(AccessTokenSettings.class).toInstance(accessTokenSettings);
                         bind(AsyncHttpClient.class).toInstance(asyncHttpClient);
+                        bind(CircuitBreakerRegistry.class).toInstance(CircuitBreakerRegistry.ofDefaults());
                     }
                 }, underTest);
     }

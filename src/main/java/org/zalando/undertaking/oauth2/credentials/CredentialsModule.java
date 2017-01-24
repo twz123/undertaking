@@ -5,7 +5,7 @@ import javax.inject.Singleton;
 import com.google.inject.AbstractModule;
 import com.google.inject.Provides;
 
-import rx.Single;
+import io.reactivex.Single;
 
 public class CredentialsModule extends AbstractModule {
     @Override

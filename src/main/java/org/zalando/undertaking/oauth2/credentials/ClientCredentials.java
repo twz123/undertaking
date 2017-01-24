@@ -10,6 +10,13 @@ public class ClientCredentials {
 
     private String clientSecret;
 
+    public ClientCredentials() { }
+
+    public ClientCredentials(final String clientId, final String clientSecret) {
+        this.clientId = clientId;
+        this.clientSecret = clientSecret;
+    }
+
     public String getClientId() {
         return clientId;
     }

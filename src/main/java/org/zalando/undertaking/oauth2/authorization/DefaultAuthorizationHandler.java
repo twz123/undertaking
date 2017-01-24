@@ -4,6 +4,7 @@ import static java.util.Objects.requireNonNull;
 
 import java.time.Duration;
 
+import java.util.Arrays;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -26,7 +27,10 @@ import org.zalando.undertaking.oauth2.NoAccessTokenException;
 import org.zalando.undertaking.oauth2.TokenInfoRequestException;
 import org.zalando.undertaking.problem.ProblemHandlerBuilder;
 
-import com.netflix.hystrix.exception.HystrixRuntimeException;
+import io.github.robwin.circuitbreaker.CircuitBreakerOpenException;
+
+import io.reactivex.Flowable;
+import io.reactivex.Single;
 
 import io.undertow.Handlers;
 
@@ -39,34 +43,15 @@ import io.undertow.util.Headers;
 import io.undertow.util.SameThreadExecutor;
 import io.undertow.util.StatusCodes;
 
-import rx.Observable;
-import rx.Single;
-
 /**
  * Default implementation for OAuth2 based HTTP request authorization. Uses a {@link ProblemHandlerBuilder} to create
  * {@code HttpHandlers} if authorization failed.
  */
 public class DefaultAuthorizationHandler implements AuthorizationHandler {
 
-    public interface Settings extends AuthenticationInfoSettings {
-
-        /**
-         * The OAuth realm to be reported to clients in {@code WWW-Authenticate} headers.
-         */
-        String getRealm();
-
-        /**
-         * Timeout for the whole authorization flow. If processing time exceeds this threshold, request processing is
-         * aborted and an {@code Internal Server Error} is reported to clients.
-         */
-        Duration getTimeout();
-    }
-
     private static final Logger LOG = LoggerFactory.getLogger(DefaultAuthorizationHandler.class);
-
     private static final String FORBIDDEN_ERROR_DESCRIPTION =
         "The request requires higher privileges than provided by the access token.";
-
     private final Settings settings;
     private final HttpExchangeScope scope;
     private final Provider<Single<AuthenticationInfo>> authInfoProvider;
@@ -87,7 +72,7 @@ public class DefaultAuthorizationHandler implements AuthorizationHandler {
         requireNonNull(predicate);
         requireNonNull(next);
 
-        final Observable<HttpHandler> nextEmitter = Observable.just(next);
+        final Flowable<HttpHandler> nextEmitter = Flowable.just(next);
         return exchange -> handleRequest(exchange, predicate, nextEmitter);
     }
 
@@ -98,11 +83,11 @@ public class DefaultAuthorizationHandler implements AuthorizationHandler {
         requireNonNull(nextProvider);
 
         return exchange ->
-                handleRequest(exchange, predicate, Observable.defer(() -> nextProvider.apply(exchange).toObservable()));
+                handleRequest(exchange, predicate, Flowable.defer(() -> nextProvider.apply(exchange).toFlowable()));
     }
 
     private void handleRequest(final HttpServerExchange exchange, final Predicate<? super AuthenticationInfo> predicate,
-            final Observable<HttpHandler> nextEmitter) {
+            final Flowable<HttpHandler> nextEmitter) {
 
         final Predicate<? super AuthenticationInfo> authPredicate = //
             wrapBusinessPartnerOverride(predicate, exchange.getRequestHeaders());
@@ -111,19 +96,21 @@ public class DefaultAuthorizationHandler implements AuthorizationHandler {
         // This is the last resort if something gets wrong.
         exchange.setStatusCode(StatusCodes.INTERNAL_SERVER_ERROR);
 
-        final Observable<HttpHandler> authEmitter =                              //
-            authInfoProvider.get().toObservable()                                //
+        final Flowable<HttpHandler> authEmitter =                                //
+            authInfoProvider.get().toFlowable()                                  //
                             .filter(authInfo -> !authPredicate.test(authInfo))   //
                             .map(authInfo -> forbidden(authInfo, authPredicate)) //
-                            .onErrorResumeNext(error -> Observable.just(handleAuthError(error)));
+                            .onErrorResumeNext(error -> {
+                                return Flowable.just(handleAuthError(error));
+                            });
 
         final Single<HttpHandler> handlerSingle =
-            Observable.concatEager(authEmitter, nextEmitter)                                //
-                      .take(1)                                                              //
-                      .toSingle()                                                           //
-                      .timeout(settings.getTimeout().toNanos(), TimeUnit.NANOSECONDS,
-                          Single.error(new TimeoutException("Timed out while authorizing request."))) //
-                      .onErrorResumeNext(error -> Single.just(internalServerError(error)));
+            Flowable.concatEager(Arrays.asList(authEmitter, nextEmitter))                   //
+                    .take(1)                                                                //
+                    .singleOrError()                                                        //
+                    .timeout(settings.getTimeout().toNanos(), TimeUnit.NANOSECONDS,
+                        Single.error(new TimeoutException("Timed out while authorizing request."))) //
+                    .onErrorResumeNext(error -> Single.just(internalServerError(error)));
 
         final String requestId = LOG.isTraceEnabled() ? Integer.toHexString(exchange.hashCode()) : null;
         if (requestId != null) {
@@ -172,8 +159,12 @@ public class DefaultAuthorizationHandler implements AuthorizationHandler {
             return unauthorized(btie.getError(), btie.getErrorDescription().orElse(btie.getError()));
         }
 
-        if (e instanceof HystrixRuntimeException) {
-            return handleHystrixError((HystrixRuntimeException) e);
+        if (e instanceof TimeoutException) {
+            return gatewayTimeout(e);
+        }
+
+        if (e instanceof CircuitBreakerOpenException) {
+            return gatewayTimeout(e);
         }
 
         if (e instanceof NoAccessTokenException) {
@@ -189,22 +180,6 @@ public class DefaultAuthorizationHandler implements AuthorizationHandler {
         }
 
         return internalServerError(e);
-    }
-
-    private HttpHandler handleHystrixError(final HystrixRuntimeException e) {
-        switch (e.getFailureType()) {
-
-            case TIMEOUT :
-            case SHORTCIRCUIT :
-                return gatewayTimeout(e);
-
-            case REJECTED_SEMAPHORE_EXECUTION :
-            case REJECTED_THREAD_EXECUTION :
-                return serviceUnavailable(e);
-
-            default :
-                return internalServerError(e);
-        }
     }
 
     protected HttpHandler unauthorized(final String oauthError, final String message) {
@@ -254,7 +229,7 @@ public class DefaultAuthorizationHandler implements AuthorizationHandler {
                           .build(StatusCodes.SERVICE_UNAVAILABLE);
     }
 
-    private HttpHandler gatewayTimeout(final HystrixRuntimeException e) {
+    private HttpHandler gatewayTimeout(final Throwable e) {
         return
             problemBuilder.get()                                                           //
                           .setError(e)                                                     //
@@ -282,6 +257,20 @@ public class DefaultAuthorizationHandler implements AuthorizationHandler {
 
         final String overrideScope = settings.getBusinessPartnerIdOverrideScope();
         return new BusinessPartnerOverridePredicate(overrideScope).and(predicate);
+    }
+
+    public interface Settings extends AuthenticationInfoSettings {
+
+        /**
+         * The OAuth realm to be reported to clients in {@code WWW-Authenticate} headers.
+         */
+        String getRealm();
+
+        /**
+         * Timeout for the whole authorization flow. If processing time exceeds this threshold, request processing is
+         * aborted and an {@code Internal Server Error} is reported to clients.
+         */
+        Duration getTimeout();
     }
 
     private static final class BusinessPartnerOverridePredicate implements AuthenticationInfoPredicate {

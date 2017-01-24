@@ -2,12 +2,6 @@ package org.zalando.undertaking.oauth2;
 
 import static java.time.temporal.ChronoUnit.DAYS;
 
-import static java.util.concurrent.TimeUnit.MILLISECONDS;
-
-import static org.hamcrest.MatcherAssert.assertThat;
-
-import static org.hamcrest.Matchers.is;
-
 import static org.mockito.ArgumentMatchers.any;
 
 import static org.mockito.Mockito.times;
@@ -23,8 +17,8 @@ import java.time.Instant;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import org.junit.runner.RunWith;
@@ -37,17 +31,17 @@ import org.zalando.undertaking.oauth2.credentials.ClientCredentials;
 import org.zalando.undertaking.oauth2.credentials.RequestCredentials;
 import org.zalando.undertaking.oauth2.credentials.UserCredentials;
 
-import rx.Observable;
-import rx.Single;
-import rx.Subscription;
+import io.reactivex.Single;
 
-import rx.functions.Action0;
-import rx.functions.Action1;
+import io.reactivex.functions.BiPredicate;
 
-import rx.functions.Func2;
-import rx.subjects.AsyncSubject;
-import rx.subjects.PublishSubject;
+import io.reactivex.observers.TestObserver;
 
+import io.reactivex.plugins.RxJavaPlugins;
+
+import io.reactivex.schedulers.TestScheduler;
+
+@SuppressWarnings("unchecked")
 @RunWith(MockitoJUnitRunner.class)
 public class AccessTokenProviderTest {
 
@@ -63,6 +57,7 @@ public class AccessTokenProviderTest {
     @Mock
     private Clock clock;
 
+    private TestScheduler testScheduler;
     private AccessTokenProvider underTest;
 
     @Before
@@ -71,79 +66,96 @@ public class AccessTokenProviderTest {
         when(clock.instant()).thenReturn(Instant.EPOCH);
 
         underTest = new AccessTokenProvider(Single.defer(() -> requestCredentials), requestProvider, settings, clock);
+
+        testScheduler = new TestScheduler();
+        RxJavaPlugins.setComputationSchedulerHandler((s) -> testScheduler);
     }
 
-    // FIXME Needs analysis for correctness. Fails sporadically on CI due to timeouts.
-    @Ignore("This test is flaky, needs fix!")
-    @Test(timeout = 30000)
+    @After
+    public void tearDown() {
+        RxJavaPlugins.reset();
+    }
+
+    @Test
+    public void waitsIfGetOccursBeforeUpdate() {
+        final RequestCredentials credentials = requestCredentials.blockingGet();
+
+        when(requestProvider.requestAccessToken(credentials)).thenReturn(tokenResponse("first", Instant.EPOCH));
+
+        TestObserver<AccessToken> test = underTest.get().test();
+
+        underTest.update().subscribe();
+        testScheduler.triggerActions();
+        test.assertValue(AccessToken.bearer("first"));
+    }
+
+    @Test
+    public void throwsIfGetOccursBeforeUpdateAndUpdateNeverArrives() {
+        TestObserver<AccessToken> test = underTest.get().test();
+
+        testScheduler.advanceTimeBy(2, TimeUnit.SECONDS);
+        test.assertError(TimeoutException.class);
+    }
+
+    @Test
     public void automaticallyRefreshesAccessToken() {
-        final PublishSubject<AccessTokenResponse> input = PublishSubject.create();
-        final PublishSubject<Void> consumed = PublishSubject.create();
-        final RequestCredentials credentials = requestCredentials.toBlocking().value();
-        final Action0 notifyConsumed = () ->
-                Observable.timer(20, TimeUnit.MILLISECONDS).subscribe(triggered -> consumed.onNext(null));
+        final RequestCredentials credentials = requestCredentials.blockingGet();
 
-        when(requestProvider.requestAccessToken(credentials)).thenReturn(input.take(1).doOnTerminate(notifyConsumed)
-                .toSingle());
+        when(requestProvider.requestAccessToken(credentials)).thenReturn(tokenResponse("first", Instant.EPOCH),
+            tokenResponse("second", Instant.EPOCH.plus(1, DAYS)), tokenResponse("third", Instant.EPOCH.plus(1, DAYS)));
+        underTest.autoUpdate();
 
-        // Use the same Single instance twice, since we're using it as a Singleton inside OAuth2Module.
-        // We need to ensure that the same instance yields current results when subscribed to.
-        final Single<AccessToken> single = underTest.get();
+        Single<AccessToken> accessTokenSingle = underTest.get();
 
-        doDuringAutoUpdate(() -> {
-            input.onNext(new AccessTokenResponse(AccessToken.bearer("first"), Instant.EPOCH));
-            consumed.take(1).toCompletable().await();
-            assertThat(single.toBlocking().value(), is(AccessToken.bearer("first")));
+        // Got expired token ('first'); instantly requests new token and gets 'second'
+        testScheduler.triggerActions();
+        accessTokenSingle.test().assertValue(AccessToken.bearer("second"));
 
-            input.onNext(new AccessTokenResponse(AccessToken.bearer("second"), Instant.EPOCH.plus(1, DAYS)));
-            consumed.take(1).toCompletable().await();
-            assertThat(single.toBlocking().value(), is(AccessToken.bearer("second")));
+        // 'second' is set to expire in one day; so after one day passes, the third token should be requested.
+        testScheduler.advanceTimeBy(1, TimeUnit.DAYS);
+        accessTokenSingle.test().assertValue(AccessToken.bearer("third"));
 
-            verify(requestProvider, times(2)).requestAccessToken(credentials);
-            verifyNoMoreInteractions(requestProvider);
-        });
+        verify(requestProvider, times(3)).requestAccessToken(credentials);
+        verifyNoMoreInteractions(requestProvider);
     }
 
-    @Test(timeout = 30000)
+    @Test
     public void restartsThresholdProviderAfterSuccessfulRequest() {
-        final AccessTokenResponse first = new AccessTokenResponse(AccessToken.bearer("first"), Instant.EPOCH);
-        final AccessTokenResponse second = new AccessTokenResponse(AccessToken.bearer("second"),
-                Instant.EPOCH.plus(1, DAYS));
+        when(requestProvider.requestAccessToken(any())).thenReturn(errorResponse("first time"),
+            errorResponse("0 sec retry after first time"), tokenResponse("first", Instant.EPOCH.plusSeconds(2)),
+            errorResponse("second time"), errorResponse("0 sec retry after second time"),
+            tokenResponse("second", Instant.EPOCH.plus(1, DAYS)));
 
-        final AsyncSubject<Void> consumed = AsyncSubject.create();
-        final Action1<? super AccessTokenResponse> notifyConsumed = token ->
-                Observable.timer(20, MILLISECONDS).doOnTerminate(() -> consumed.onCompleted()).subscribe();
+        underTest.autoUpdate();
 
-        when(requestProvider.requestAccessToken(any())).thenReturn(connectError("first time"))                    //
-                                                       .thenReturn(connectError("0 sec retry after first time"))  //
-                                                       .thenReturn(Single.just(first))                            //
-                                                       .thenReturn(connectError("second time"))                   //
-                                                       .thenReturn(connectError("0 sec retry after second time")) //
-                                                       .thenReturn(Single.just(second).doOnSuccess(notifyConsumed));
+        BiPredicate<Integer, Throwable> ignoreTimeouts = (count, error) -> error instanceof TimeoutException;
+
+        // The initial two calls fail
+        testScheduler.triggerActions();
 
         final Single<AccessToken> single = underTest.get();
 
-        doDuringAutoUpdate(() -> {
-            Func2<Integer, Throwable, Boolean> ignoreTimeouts =  (count, error) -> error instanceof TimeoutException;
-            assertThat(single.retry(ignoreTimeouts).toBlocking().value(), is(AccessToken.bearer("first")));
+        // Timeout is now set to 1s; After that, the third call succeeds
+        testScheduler.advanceTimeBy(1, TimeUnit.SECONDS);
+        single.retry(ignoreTimeouts).test().assertValue(AccessToken.bearer("first"));
 
-            consumed.toCompletable().await();
-            assertThat(single.retry(ignoreTimeouts).toBlocking().value(), is(AccessToken.bearer("second")));
+        // 'first' is valid for 2s (wow).
+        testScheduler.advanceTimeBy(2, TimeUnit.SECONDS);
 
-            verify(requestProvider, times(6)).requestAccessToken(any());
-        });
+        // The next two calls fail, timeout is now set to 1s
+        testScheduler.advanceTimeBy(1, TimeUnit.SECONDS);
+
+        // Great success
+        single.retry(ignoreTimeouts).test().assertValue(AccessToken.bearer("second"));
+
+        verify(requestProvider, times(6)).requestAccessToken(any());
     }
 
-    private void doDuringAutoUpdate(final Runnable action) {
-        final Subscription updateSubscription = underTest.autoUpdate();
-        try {
-            action.run();
-        } finally {
-            updateSubscription.unsubscribe();
-        }
-    }
-
-    private static <T> Single<T> connectError(final String message) {
+    private <T> Single<T> errorResponse(final String message) {
         return Single.error(new ConnectException(message));
+    }
+
+    private Single<AccessTokenResponse> tokenResponse(final String value, final Instant time) {
+        return Single.just(new AccessTokenResponse(AccessToken.bearer(value), time));
     }
 }

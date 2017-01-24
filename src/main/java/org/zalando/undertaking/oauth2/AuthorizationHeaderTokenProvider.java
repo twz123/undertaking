@@ -9,11 +9,11 @@ import javax.inject.Provider;
 
 import org.zalando.undertaking.inject.Request;
 
+import io.reactivex.Single;
+
 import io.undertow.util.HeaderMap;
 import io.undertow.util.HeaderValues;
 import io.undertow.util.Headers;
-
-import rx.Single;
 
 public final class AuthorizationHeaderTokenProvider implements Provider<Single<AccessToken>> {
 

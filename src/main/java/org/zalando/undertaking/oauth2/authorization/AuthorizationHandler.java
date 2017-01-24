@@ -5,10 +5,10 @@ import java.util.function.Predicate;
 
 import org.zalando.undertaking.oauth2.AuthenticationInfo;
 
+import io.reactivex.Single;
+
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
-
-import rx.Single;
 
 /**
  * Handles authorization by evaluating predicates against the {@code AuthenticationInfo} of a HTTP request. If a request

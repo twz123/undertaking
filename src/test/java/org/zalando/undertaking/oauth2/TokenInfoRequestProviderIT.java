@@ -50,13 +50,14 @@ import com.google.common.collect.ImmutableMap;
 
 import com.google.gson.Gson;
 
+import io.github.robwin.circuitbreaker.CircuitBreakerRegistry;
+
 import io.undertow.util.HeaderMap;
 import io.undertow.util.HttpString;
 import io.undertow.util.StatusCodes;
 
 @RunWith(MockitoJUnitRunner.class)
 public class TokenInfoRequestProviderIT {
-
     @Rule
     public ExpectedException expected = ExpectedException.none();
 
@@ -72,6 +73,13 @@ public class TokenInfoRequestProviderIT {
 
     private TokenInfoRequestProvider underTest;
 
+    private static HeaderMap provideRequestHeaders() {
+        final HeaderMap requestHeaders = new HeaderMap();
+        requestHeaders.put(new HttpString("X-Business-Partner-Id"), "4711");
+
+        return requestHeaders;
+    }
+
     @Before
     public void setUp() {
         httpClient = new DefaultAsyncHttpClient();
@@ -80,7 +88,7 @@ public class TokenInfoRequestProviderIT {
                 "http://localhost:" + serverRule.getPort() + "/tokeninfo"));
         when(settings.getBusinessPartnerIdOverrideHeader()).thenReturn("X-Business-Partner-Id");
 
-        underTest = new TokenInfoRequestProvider(settings, httpClient);
+        underTest = new TokenInfoRequestProvider(settings, httpClient, CircuitBreakerRegistry.ofDefaults());
     }
 
     @After
@@ -108,21 +116,20 @@ public class TokenInfoRequestProviderIT {
                                         "uid", "testuser",                                                         //
                                         "scope", Collections.emptySet()))));
 
-        final AuthenticationInfo authInfo = underTest.createCommand(AccessToken.bearer(
-                                                             "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"),
-                                                         provideRequestHeaders()).toObservable().toBlocking().first();
+        final AuthenticationInfo authInfo = underTest.getTokenInfo(AccessToken.bearer(
+                    "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"), provideRequestHeaders()).blockingGet();
 
         assertThat(authInfo, hasFeature(AuthenticationInfo::getBusinessPartnerId, hasValue("4711")));
     }
 
     @Test
-    public void handlesBadRequest() {
+    public void handlesBadRequest() throws InterruptedException {
         mockServerClient.when(
                             request()                                             //
                             .withMethod("GET")                                    //
                             .withPath("/tokeninfo")                               //
                             .withQueryStringParameter("access_token", "foo"),     //
-                            Times.once())                                         //
+                            Times.unlimited())                                    //
                         .respond(
                             response()                                            //
                             .withStatusCode(StatusCodes.BAD_REQUEST)              //
@@ -132,19 +139,12 @@ public class TokenInfoRequestProviderIT {
                                         "error", "invalid_request",               //
                                         "error_description", "Access Token not valid"))));
 
-        expected.expectCause(allOf(                                                  //
+        expected.expect(allOf(                                                       //
                 instanceOf(BadTokenInfoException.class),                             //
                 hasProperty("error", is("invalid_token")),                           //
                 hasProperty("errorDescription", hasValue("Access Token not valid"))) //
             );
 
-        underTest.createCommand(AccessToken.bearer("foo"), provideRequestHeaders()).toObservable().toBlocking().first();
-    }
-
-    private static HeaderMap provideRequestHeaders() {
-        final HeaderMap requestHeaders = new HeaderMap();
-        requestHeaders.put(new HttpString("X-Business-Partner-Id"), "4711");
-
-        return requestHeaders;
+        underTest.getTokenInfo(AccessToken.bearer("foo"), provideRequestHeaders()).blockingGet();
     }
 }

@@ -7,15 +7,18 @@ import java.util.concurrent.atomic.AtomicReference;
 import javax.inject.Inject;
 import javax.inject.Provider;
 
-import org.zalando.undertaking.hystrix.HystrixCommands;
 import org.zalando.undertaking.inject.Request;
 
+import io.reactivex.Single;
+import io.reactivex.SingleEmitter;
+import io.reactivex.SingleObserver;
+import io.reactivex.SingleOnSubscribe;
+
+import io.reactivex.disposables.Disposable;
+
+import io.reactivex.subjects.AsyncSubject;
+
 import io.undertow.util.HeaderMap;
-
-import rx.Single;
-import rx.SingleSubscriber;
-
-import rx.subjects.AsyncSubject;
 
 public final class AuthenticationInfoProvider implements Provider<Single<AuthenticationInfo>> {
 
@@ -36,21 +39,14 @@ public final class AuthenticationInfoProvider implements Provider<Single<Authent
     @Override
     public Single<AuthenticationInfo> get() {
         final HeaderMap requestHeaders = requestHeadersProvider.get();
-        final Single<AuthenticationInfo> source = accessTokenProvider.get().flatMap(token -> {
-
-                if (!token.isOfType("Bearer")) {
-                    return MALFORMED_TOKEN;
-                }
-
-                return HystrixCommands.withRetries(() -> requestProvider.createCommand(token, requestHeaders), 3)
-                        .toSingle();
-            });
+        final Single<AuthenticationInfo> source = accessTokenProvider.get().flatMap(token ->
+                    requestProvider.getTokenInfo(token, requestHeaders));
 
         return Single.create(new CachedSubscribe<>(source));
     }
 
     @SuppressWarnings("serial")
-    private static final class CachedSubscribe<T> extends AtomicReference<Single<T>> implements Single.OnSubscribe<T> {
+    private static final class CachedSubscribe<T> extends AtomicReference<Single<T>> implements SingleOnSubscribe<T> {
 
         private final Single<? extends T> source;
 
@@ -59,25 +55,41 @@ public final class AuthenticationInfoProvider implements Provider<Single<Authent
         }
 
         @Override
-        public void call(final SingleSubscriber<? super T> subscriber) {
-
-            Single<T> emitter;
+        public void subscribe(final SingleEmitter<T> emitter) throws Exception {
+            Single<T> single;
 
             for (;;) {
-                emitter = get();
-                if (emitter != null) {
+                single = get();
+                if (single != null) {
                     break;
                 }
 
                 final AsyncSubject<T> subject = AsyncSubject.create();
-                emitter = subject.toSingle();
-                if (compareAndSet(null, emitter)) {
-                    source.subscribe(subject);
+                single = subject.singleOrError();
+
+                if (compareAndSet(null, single)) {
+                    source.subscribe(new SingleObserver<T>() {
+                            @Override
+                            public void onSubscribe(final Disposable d) {
+                                subject.onSubscribe(d);
+                            }
+
+                            @Override
+                            public void onSuccess(final T t) {
+                                subject.onNext(t);
+                                subject.onComplete();
+                            }
+
+                            @Override
+                            public void onError(final Throwable e) {
+                                subject.onError(e);
+                            }
+                        });
                     break;
                 }
             }
 
-            emitter.subscribe(subscriber);
+            single.subscribe(emitter::onSuccess, emitter::onError);
         }
     }
 }

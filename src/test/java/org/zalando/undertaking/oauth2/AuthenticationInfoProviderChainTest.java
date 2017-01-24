@@ -25,9 +25,9 @@ import org.mockito.Mock;
 
 import org.mockito.runners.MockitoJUnitRunner;
 
-import rx.Single;
+import io.reactivex.Single;
 
-import rx.observers.TestSubscriber;
+import io.reactivex.observers.TestObserver;
 
 @RunWith(MockitoJUnitRunner.class)
 public class AuthenticationInfoProviderChainTest {
@@ -40,6 +40,10 @@ public class AuthenticationInfoProviderChainTest {
 
     private Provider<Single<AuthenticationInfo>> underTest;
 
+    private static <T> TestObserver<T> subscribeTo(final Single<T> single) {
+        return single.test().awaitDone(30, TimeUnit.SECONDS);
+    }
+
     @Before
     public void initializeTest() {
         underTest = new AuthenticationInfoProviderChain(Arrays.asList(first, second));
@@ -49,7 +53,7 @@ public class AuthenticationInfoProviderChainTest {
     public void emitsBadTokenInfoWithoutProviders() {
         final Single<AuthenticationInfo> single = new AuthenticationInfoProviderChain(Collections.emptyList()).get();
 
-        final TestSubscriber<AuthenticationInfo> subscriber = subscribeTo(single);
+        final TestObserver<AuthenticationInfo> subscriber = subscribeTo(single);
         subscriber.assertNoValues();
         subscriber.assertError(BadTokenInfoException.class);
     }
@@ -59,7 +63,7 @@ public class AuthenticationInfoProviderChainTest {
         when(first.get()).thenReturn(Single.just(firstInfo));
         when(second.get()).thenReturn(Single.just(secondInfo));
 
-        final TestSubscriber<AuthenticationInfo> subscriber = subscribeTo(underTest.get());
+        final TestObserver<AuthenticationInfo> subscriber = subscribeTo(underTest.get());
         subscriber.assertNoErrors();
         subscriber.assertValue(firstInfo);
     }
@@ -69,7 +73,7 @@ public class AuthenticationInfoProviderChainTest {
         when(first.get()).thenReturn(Single.error(new BadTokenInfoException((String) null, (String) null)));
         when(second.get()).thenReturn(Single.just(secondInfo));
 
-        final TestSubscriber<AuthenticationInfo> subscriber = subscribeTo(underTest.get());
+        final TestObserver<AuthenticationInfo> subscriber = subscribeTo(underTest.get());
         subscriber.assertNoErrors();
         subscriber.assertValue(secondInfo);
     }
@@ -79,7 +83,7 @@ public class AuthenticationInfoProviderChainTest {
         when(first.get()).thenReturn(Single.error(new MalformedAccessTokenException()));
         when(second.get()).thenReturn(Single.just(secondInfo));
 
-        final TestSubscriber<AuthenticationInfo> subscriber = subscribeTo(underTest.get());
+        final TestObserver<AuthenticationInfo> subscriber = subscribeTo(underTest.get());
         subscriber.assertNoErrors();
         subscriber.assertValue(secondInfo);
     }
@@ -90,7 +94,7 @@ public class AuthenticationInfoProviderChainTest {
         when(first.get()).thenReturn(Single.error(expected));
         when(second.get()).thenReturn(Single.just(secondInfo));
 
-        final TestSubscriber<AuthenticationInfo> subscriber = subscribeTo(underTest.get());
+        final TestObserver<AuthenticationInfo> subscriber = subscribeTo(underTest.get());
         subscriber.assertNoValues();
         subscriber.assertError(expected);
     }
@@ -100,7 +104,7 @@ public class AuthenticationInfoProviderChainTest {
         when(first.get()).thenReturn(Single.just(firstInfo));
         when(second.get()).thenReturn(Single.error(new RuntimeException()));
 
-        final TestSubscriber<AuthenticationInfo> subscriber = subscribeTo(underTest.get());
+        final TestObserver<AuthenticationInfo> subscriber = subscribeTo(underTest.get());
         subscriber.assertNoErrors();
         subscriber.assertValue(firstInfo);
     }
@@ -121,7 +125,7 @@ public class AuthenticationInfoProviderChainTest {
 
         final Single<AuthenticationInfo> single = underTest.get();
 
-        final TestSubscriber<AuthenticationInfo> firstSubscriber = subscribeTo(single);
+        final TestObserver<AuthenticationInfo> firstSubscriber = subscribeTo(single);
         firstSubscriber.assertNoErrors();
         firstSubscriber.assertValue(firstInfo);
         verify(first).get();
@@ -129,18 +133,11 @@ public class AuthenticationInfoProviderChainTest {
         assertThat(firstSubscribeTimesCalled.get(), is(1L));
         assertThat(secondSubscribeTimesCalled.get(), lessThanOrEqualTo(1L));
 
-        final TestSubscriber<AuthenticationInfo> secondSubscriber = subscribeTo(single);
+        final TestObserver<AuthenticationInfo> secondSubscriber = subscribeTo(single);
         secondSubscriber.assertNoErrors();
         secondSubscriber.assertValue(firstInfo);
         verifyNoMoreInteractions(first, second);
         assertThat(firstSubscribeTimesCalled.get(), is(1L));
         assertThat(secondSubscribeTimesCalled.get(), lessThanOrEqualTo(1L));
-    }
-
-    private static <T> TestSubscriber<T> subscribeTo(final Single<? extends T> single) {
-        final TestSubscriber<T> subscriber = new TestSubscriber<>();
-        single.subscribe(subscriber);
-        subscriber.awaitTerminalEvent(30, TimeUnit.SECONDS);
-        return subscriber;
     }
 }
