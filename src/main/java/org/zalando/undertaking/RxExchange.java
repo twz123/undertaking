@@ -13,6 +13,13 @@ import java.nio.charset.UnsupportedCharsetException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import io.reactivex.Single;
+import io.reactivex.SingleObserver;
+
+import io.reactivex.disposables.Disposable;
+
+import io.reactivex.subjects.AsyncSubject;
+
 import io.undertow.io.Receiver.ErrorCallback;
 import io.undertow.io.Receiver.FullStringCallback;
 
@@ -23,11 +30,6 @@ import io.undertow.server.HttpServerExchange;
 
 import io.undertow.util.SameThreadExecutor;
 import io.undertow.util.StatusCodes;
-
-import rx.Single;
-import rx.Subscriber;
-
-import rx.subjects.AsyncSubject;
 
 /**
  * RxJava style interactions with Undertow's {@code HttpServerExchange} class.
@@ -84,12 +86,12 @@ public final class RxExchange {
      * <p>Usage example:
      *
      * <pre>
-     * {@code dispatch(receiveFullString(exchange).map(payload -> {
+       {@code dispatch(receiveFullString(exchange).map(payload -> {
      *      return xc -> {
      *          xc.setStatusCode(StatusCodes.OK);
      *          xc.getResponseSender().send(payload);
      *      };
-     *  }), exchange);}
+        }), exchange);}
      * </pre>
      * </p>
      *
@@ -125,11 +127,11 @@ public final class RxExchange {
         throw new AssertionError("No instances for you!");
     }
 
-    private static final class SingleDispatch extends Subscriber<HttpHandler> implements Runnable,
-        ExchangeCompletionListener {
-
+    private static final class SingleDispatch implements Runnable, ExchangeCompletionListener,
+        SingleObserver<HttpHandler> {
         private final Single<HttpHandler> handlerSingle;
         private final HttpServerExchange exchange;
+        private Disposable disposable;
 
         SingleDispatch(final Single<HttpHandler> handlerSingle, final HttpServerExchange exchange) {
             this.handlerSingle = requireNonNull(handlerSingle);
@@ -143,11 +145,18 @@ public final class RxExchange {
             handlerSingle.subscribe(this);
         }
 
-        // The Single emitted the handler to continue request processing.
         @Override
-        public void onNext(final HttpHandler handler) {
-            unsubscribe();
-            Connectors.executeRootHandler(handler, exchange);
+        public void onSubscribe(final Disposable disposable) {
+            this.disposable = disposable;
+        }
+
+        @Override
+        public void onSuccess(final HttpHandler httpHandler) {
+            if (!disposable.isDisposed()) {
+                disposable.dispose();
+            }
+
+            Connectors.executeRootHandler(httpHandler, exchange);
         }
 
         // The Single errored out, not much that we can do about that.
@@ -158,13 +167,11 @@ public final class RxExchange {
                 exchange.setStatusCode(StatusCodes.INTERNAL_SERVER_ERROR);
             }
 
-            unsubscribe();
-            exchange.endExchange();
-        }
+            if (!disposable.isDisposed()) {
+                disposable.dispose();
+            }
 
-        @Override
-        public void onCompleted() {
-            // deliberately ignored
+            exchange.endExchange();
         }
 
         // Called when the HTTP exchange is completed. Used to unsubscribe from handlerSingle if the exchange
@@ -172,7 +179,9 @@ public final class RxExchange {
         @Override
         public void exchangeEvent(final HttpServerExchange exchange, final NextListener nextListener) {
             try {
-                unsubscribe();
+                if (!disposable.isDisposed()) {
+                    disposable.dispose();
+                }
             } finally {
                 nextListener.proceed();
             }
@@ -209,7 +218,7 @@ public final class RxExchange {
             exchange.dispatch(SameThreadExecutor.INSTANCE,
                 () -> {
                     payloadSubject.onNext(payload);
-                    payloadSubject.onCompleted();
+                    payloadSubject.onComplete();
                 });
         }
 
@@ -219,7 +228,7 @@ public final class RxExchange {
         }
 
         Single<String> toSingle() {
-            return payloadSubject.toSingle();
+            return payloadSubject.singleOrError();
         }
     }
 }

@@ -8,10 +8,7 @@ import static org.hamcrest.Matchers.sameInstance;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.same;
 
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.*;
 
 import java.io.IOException;
 
@@ -24,11 +21,11 @@ import org.junit.Test;
 
 import org.junit.runner.RunWith;
 
-import org.mockito.ArgumentCaptor;
-import org.mockito.Captor;
-import org.mockito.Mock;
+import org.mockito.*;
 
 import org.mockito.runners.MockitoJUnitRunner;
+
+import io.reactivex.Single;
 
 import io.undertow.io.Receiver;
 import io.undertow.io.Receiver.ErrorCallback;
@@ -39,10 +36,6 @@ import io.undertow.server.HttpServerExchange;
 import io.undertow.server.ServerConnection;
 
 import io.undertow.util.SameThreadExecutor;
-
-import rx.Single;
-
-import rx.observers.TestSubscriber;
 
 @RunWith(MockitoJUnitRunner.class)
 public class RxExchangeTest {
@@ -83,6 +76,19 @@ public class RxExchangeTest {
     }
 
     @Test
+    public void returnsInternalServerErrorIfSingleErroredOut() throws Exception {
+        HttpServerExchange exchange = mock(HttpServerExchange.class,
+                withSettings().defaultAnswer(Mockito.CALLS_REAL_METHODS));
+
+        doReturn(exchange).when(exchange).endExchange();
+
+        RxExchange.dispatchTo(Single.error(new RuntimeException("any error"))).handleRequest(exchange);
+        assertThat(exchange.getStatusCode(), is(500));
+
+        verify(exchange).endExchange();
+    }
+
+    @Test
     public void receiveFullStringForwardsMessage() throws Exception {
         final HttpServerExchange exchange = new HttpServerExchange(mock(ServerConnection.class));
         final Field receiverField = HttpServerExchange.class.getDeclaredField("receiver");
@@ -94,11 +100,11 @@ public class RxExchangeTest {
         final String message = "foo";
         fullStringCallback.getValue().handle(new HttpServerExchange(null), message);
 
-        assertThat(single.toBlocking().value(), is(sameInstance(message)));
+        assertThat(single.blockingGet(), is(sameInstance(message)));
     }
 
     @Test
-    public void receiveFullStringforwardsError() throws Exception {
+    public void receiveFullStringForwardsError() throws Exception {
         final HttpServerExchange exchange = new HttpServerExchange(mock(ServerConnection.class));
         final Field receiverField = HttpServerExchange.class.getDeclaredField("receiver");
         receiverField.setAccessible(true);
@@ -109,8 +115,6 @@ public class RxExchangeTest {
         final IOException exception = new IOException("foo");
         errorCallback.getValue().error(new HttpServerExchange(null), exception);
 
-        final TestSubscriber<String> subscriber = new TestSubscriber<>();
-        single.subscribe(subscriber);
-        subscriber.assertError(exception);
+        single.test().assertError(exception);
     }
 }
