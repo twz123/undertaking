@@ -6,7 +6,7 @@ import org.asynchttpclient.Request;
 import org.asynchttpclient.RequestBuilder;
 import org.asynchttpclient.Response;
 
-import rx.Single;
+import io.reactivex.Single;
 
 /**
  * An abstraction of {@link AsyncHttpClient} that exposes HTTP requests and their outcome as RxJava Singles.
