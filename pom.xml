@@ -185,6 +185,23 @@
             </exclusions>
         </dependency>
 
+        <!-- RXJava2 and friends -->
+        <dependency>
+            <groupId>io.reactivex.rxjava2</groupId>
+            <artifactId>rxjava</artifactId>
+            <version>2.0.4</version>
+        </dependency>
+        <dependency>
+            <groupId>io.javaslang</groupId>
+            <artifactId>javaslang</artifactId>
+            <version>2.0.5</version>
+        </dependency>
+        <dependency>
+            <groupId>io.github.robwin</groupId>
+            <artifactId>javaslang-circuitbreaker</artifactId>
+            <version>0.8.1</version>
+        </dependency>
+
         <!-- Logging for Tests -->
         <dependency>
             <groupId>org.slf4j</groupId>
