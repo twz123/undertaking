@@ -6,12 +6,12 @@ import org.asynchttpclient.AsyncHandler;
 
 import io.reactivex.SingleEmitter;
 
-final class AsyncSingleSubscriberBridge<T> extends AbstractSingleSubscriberBridge<T> {
+final class AsyncSingleEmitterBridge<T> extends AbstractSingleEmitterBridge<T> {
 
     private final AsyncHandler<? extends T> delegate;
 
-    public AsyncSingleSubscriberBridge(SingleEmitter<T> subscriber, AsyncHandler<? extends T> delegate) {
-        super(subscriber);
+    public AsyncSingleEmitterBridge(SingleEmitter<T> emitter, AsyncHandler<? extends T> delegate) {
+        super(emitter);
         this.delegate = requireNonNull(delegate);
     }
 

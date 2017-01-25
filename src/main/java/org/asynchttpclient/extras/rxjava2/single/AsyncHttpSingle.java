@@ -73,7 +73,9 @@ public final class AsyncHttpSingle {
      * @throws NullPointerException if at least one of the parameters is
      *                              {@code null}
      */
-    public static <T> Single<T> create(BoundRequestBuilder builder, Supplier<? extends AsyncHandler<? extends T>> handlerSupplier) {
+    public static <T> Single<T> create(BoundRequestBuilder builder,
+                                       Supplier<? extends AsyncHandler<? extends T>> handlerSupplier) {
+
         requireNonNull(builder);
         return create(builder::execute, handlerSupplier);
     }
@@ -98,7 +100,8 @@ public final class AsyncHttpSingle {
      * @throws NullPointerException if at least one of the parameters is
      *                              {@code null}
      */
-    public static <T> Single<T> create(Function<? super AsyncHandler<?>, ? extends Future<?>> requestTemplate, Supplier<? extends AsyncHandler<? extends T>> handlerSupplier) {
+    public static <T> Single<T> create(Function<? super AsyncHandler<?>, ? extends Future<?>> requestTemplate,
+                                       Supplier<? extends AsyncHandler<? extends T>> handlerSupplier) {
 
         requireNonNull(requestTemplate);
         requireNonNull(handlerSupplier);
@@ -111,11 +114,10 @@ public final class AsyncHttpSingle {
     }
 
     static <T> AsyncHandler<?> createBridge(SingleEmitter<? super T> subscriber, AsyncHandler<? extends T> handler) {
-
         if (handler instanceof ProgressAsyncHandler) {
-            return new ProgressAsyncSingleSubscriberBridge<>(subscriber, (ProgressAsyncHandler<? extends T>) handler);
+            return new ProgressAsyncSingleEmitterBridge<>(subscriber, (ProgressAsyncHandler<? extends T>) handler);
         }
 
-        return new AsyncSingleSubscriberBridge<>(subscriber, handler);
+        return new AsyncSingleEmitterBridge<>(subscriber, handler);
     }
 }

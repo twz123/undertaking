@@ -6,12 +6,12 @@ import org.asynchttpclient.handler.ProgressAsyncHandler;
 
 import io.reactivex.SingleEmitter;
 
-final class ProgressAsyncSingleSubscriberBridge<T> extends AbstractProgressSingleSubscriberBridge<T> {
+final class ProgressAsyncSingleEmitterBridge<T> extends AbstractProgressSingleEmitterBridge<T> {
 
     private final ProgressAsyncHandler<? extends T> delegate;
 
-    public ProgressAsyncSingleSubscriberBridge(SingleEmitter<T> subscriber, ProgressAsyncHandler<? extends T> delegate) {
-        super(subscriber);
+    public ProgressAsyncSingleEmitterBridge(SingleEmitter<T> emitter, ProgressAsyncHandler<? extends T> delegate) {
+        super(emitter);
         this.delegate = requireNonNull(delegate);
     }
 

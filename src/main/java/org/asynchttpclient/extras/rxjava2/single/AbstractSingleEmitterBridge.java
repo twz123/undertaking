@@ -18,31 +18,31 @@ import io.reactivex.SingleEmitter;
 import io.reactivex.exceptions.CompositeException;
 import io.reactivex.exceptions.Exceptions;
 
-abstract public class AbstractSingleSubscriberBridge<T> implements AsyncHandler<Void> {
+abstract public class AbstractSingleEmitterBridge<T> implements AsyncHandler<Void> {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(AbstractSingleSubscriberBridge.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(AbstractSingleEmitterBridge.class);
 
-    protected final SingleEmitter<T> subscriber;
+    protected final SingleEmitter<T> emitter;
 
     private final AtomicBoolean delegateTerminated = new AtomicBoolean();
 
-    protected AbstractSingleSubscriberBridge(SingleEmitter<T> subscriber) {
-        this.subscriber = requireNonNull(subscriber);
+    protected AbstractSingleEmitterBridge(SingleEmitter<T> emitter) {
+        this.emitter = requireNonNull(emitter);
     }
 
     @Override
     public State onBodyPartReceived(HttpResponseBodyPart content) throws Exception {
-        return subscriber.isDisposed() ? abort() : delegate().onBodyPartReceived(content);
+        return emitter.isDisposed() ? abort() : delegate().onBodyPartReceived(content);
     }
 
     @Override
     public State onStatusReceived(HttpResponseStatus status) throws Exception {
-        return subscriber.isDisposed() ? abort() : delegate().onStatusReceived(status);
+        return emitter.isDisposed() ? abort() : delegate().onStatusReceived(status);
     }
 
     @Override
     public State onHeadersReceived(HttpResponseHeaders headers) throws Exception {
-        return subscriber.isDisposed() ? abort() : delegate().onHeadersReceived(headers);
+        return emitter.isDisposed() ? abort() : delegate().onHeadersReceived(headers);
     }
 
     @Override
@@ -59,11 +59,11 @@ abstract public class AbstractSingleSubscriberBridge<T> implements AsyncHandler<
             return null;
         }
 
-        if (!subscriber.isDisposed()) {
+        if (!emitter.isDisposed()) {
             if (result == null) {
-                subscriber.onError(new AbortedException());
+                emitter.onError(new AbortedException());
             } else {
-                subscriber.onSuccess(result);
+                emitter.onSuccess(result);
             }
         }
         return null;
@@ -99,8 +99,8 @@ abstract public class AbstractSingleSubscriberBridge<T> implements AsyncHandler<
 
     private void emitOnError(Throwable error) {
         Exceptions.throwIfFatal(error);
-        if (!subscriber.isDisposed()) {
-            subscriber.onError(error);
+        if (!emitter.isDisposed()) {
+            emitter.onError(error);
         } else {
             LOGGER.debug("Not propagating onError after unsubscription: {}", error.getMessage(), error);
         }

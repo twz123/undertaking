@@ -1,19 +1,17 @@
 package org.asynchttpclient.extras.rxjava2;
 
-import static org.asynchttpclient.Dsl.*;
-
-import java.util.concurrent.TimeUnit;
-
+import io.reactivex.Observable;
 import org.asynchttpclient.AsyncHttpClient;
 import org.junit.Test;
 
-import io.reactivex.Observable;
+import java.util.concurrent.TimeUnit;
 
+import static org.asynchttpclient.Dsl.asyncHttpClient;
 
 public class AsyncHttpObservableTest {
 
     @Test
-    public void testToFlowableNoError() {
+    public void testToObservableNoError() {
         try (AsyncHttpClient client = asyncHttpClient()) {
             AsyncHttpObservable.toObservable(() -> client.prepareGet("http://gatling.io"))
                     .test()
@@ -25,7 +23,7 @@ public class AsyncHttpObservableTest {
     }
 
     @Test
-    public void testToFlowableError() {
+    public void testToObservableError() {
         try (AsyncHttpClient client = asyncHttpClient()) {
             AsyncHttpObservable.toObservable(() -> client.prepareGet("http://gatling.io/ttfn"))
                     .test()
@@ -34,7 +32,6 @@ public class AsyncHttpObservableTest {
         } catch (Exception e) {
             Thread.currentThread().interrupt();
         }
-
     }
 
     @Test
