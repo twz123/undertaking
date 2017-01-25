@@ -1,18 +1,14 @@
 package org.zalando.undertaking.oauth2.credentials;
 
-import static org.hamcrest.MatcherAssert.assertThat;
-
-import static org.hamcrest.Matchers.equalTo;
-
 import static org.mockito.Mockito.when;
-
-import static org.zalando.undertaking.test.rx.hamcrest.TestSubscriberMatchers.hasOnlyValue;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.Writer;
 
 import java.nio.file.Files;
+
+import java.util.concurrent.TimeUnit;
 
 import javax.inject.Provider;
 
@@ -30,9 +26,7 @@ import org.mockito.runners.MockitoJUnitRunner;
 
 import com.google.common.base.MoreObjects;
 
-import rx.Single;
-
-import rx.observers.TestSubscriber;
+import io.reactivex.Single;
 
 @RunWith(MockitoJUnitRunner.class)
 public class CredentialsProviderTest {
@@ -46,6 +40,13 @@ public class CredentialsProviderTest {
 
     private File credentialsFile;
 
+    private static void writeToCredentialsFile(final File credentialsFile, final String foo, final String bar)
+        throws IOException {
+        try(final Writer writer = Files.newBufferedWriter(credentialsFile.toPath())) {
+            writer.write(String.format("{\"foo\": \"%s\", \"bar\": \"%s\"}", foo, bar));
+        }
+    }
+
     @Before
     public void setUp() throws IOException {
         when(config.getCredentialsDirectory()).thenReturn(temporaryFolder.getRoot().toPath());
@@ -56,19 +57,7 @@ public class CredentialsProviderTest {
 
     @Test
     public void readsCredentialsFromFile() {
-        TestSubscriber<TestCredentials> subscriber = new TestSubscriber<>();
-
-        underTest.get().subscribe(subscriber);
-
-        subscriber.awaitTerminalEvent();
-        assertThat(subscriber, hasOnlyValue(equalTo(createCredentials("bar", "foo"))));
-    }
-
-    private static void writeToCredentialsFile(final File credentialsFile, final String foo, final String bar)
-        throws IOException {
-        try(final Writer writer = Files.newBufferedWriter(credentialsFile.toPath())) {
-            writer.write(String.format("{\"foo\": \"%s\", \"bar\": \"%s\"}", foo, bar));
-        }
+        underTest.get().test().awaitDone(10, TimeUnit.SECONDS).assertValue(createCredentials("bar", "foo"));
     }
 
     private File createTestCredentialsFile() throws IOException {

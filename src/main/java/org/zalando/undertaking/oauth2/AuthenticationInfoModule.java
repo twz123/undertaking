@@ -6,7 +6,7 @@ import org.zalando.undertaking.inject.Request;
 import com.google.inject.PrivateModule;
 import com.google.inject.TypeLiteral;
 
-import rx.Single;
+import io.reactivex.Single;
 
 /**
  * Provides OAuth2 authentication info for HTTP requests.

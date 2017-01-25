@@ -5,7 +5,7 @@ import static java.util.Objects.requireNonNull;
 import javax.inject.Inject;
 import javax.inject.Provider;
 
-import rx.Single;
+import io.reactivex.Single;
 
 /**
  * Provides a combination of {@code ClientCredentials} and {@code UserCredentials}.

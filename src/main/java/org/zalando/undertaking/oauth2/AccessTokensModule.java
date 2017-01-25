@@ -25,7 +25,7 @@ import com.google.inject.TypeLiteral;
 import com.google.inject.matcher.Matchers;
 import com.google.inject.spi.ProvisionListener;
 
-import rx.Single;
+import io.reactivex.Single;
 
 /**
  * Provides the access token for accessing OAuth secured services.
@@ -37,6 +37,16 @@ public class AccessTokensModule extends AbstractModule {
     private static final TypeLiteral<Single<AccessToken>> TOKEN_TYPE = new TypeLiteral<Single<AccessToken>>() {
         // capture generic type
     };
+
+    private static Iterable<Map.Entry<String, AccessToken>> deserializeTokens(final String tokens) {
+        final Splitter tokenSplitter = Splitter.on('=').limit(2);
+        return FluentIterable.from(Splitter.on(',').split(tokens)).transform(token -> {
+                final Iterator<String> splitter = tokenSplitter.split(token).iterator();
+                final String name = CharMatcher.WHITESPACE.trimFrom(Iterators.getNext(splitter, ""));
+                final String value = CharMatcher.WHITESPACE.trimFrom(Iterators.getNext(splitter, ""));
+                return Maps.immutableEntry(name, AccessToken.bearer(value));
+            });
+    }
 
     @Override
     protected void configure() {
@@ -70,16 +80,6 @@ public class AccessTokensModule extends AbstractModule {
         // start auto-updater
         // currently, we don't care about unsubscription, since we don't have any facility to "shutdown" the app
         accessTokenProvider.autoUpdate();
-    }
-
-    private static Iterable<Map.Entry<String, AccessToken>> deserializeTokens(final String tokens) {
-        final Splitter tokenSplitter = Splitter.on('=').limit(2);
-        return FluentIterable.from(Splitter.on(',').split(tokens)).transform(token -> {
-                final Iterator<String> splitter = tokenSplitter.split(token).iterator();
-                final String name = CharMatcher.WHITESPACE.trimFrom(Iterators.getNext(splitter, ""));
-                final String value = CharMatcher.WHITESPACE.trimFrom(Iterators.getNext(splitter, ""));
-                return Maps.immutableEntry(name, AccessToken.bearer(value));
-            });
     }
 
     private final class TokenRefresherModule extends PrivateModule {

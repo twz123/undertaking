@@ -5,23 +5,18 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasProperty;
 import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.sameInstance;
 
 import static org.hobsoft.hamcrest.compose.ComposeMatchers.compose;
 import static org.hobsoft.hamcrest.compose.ComposeMatchers.hasFeatureValue;
 
-import static org.mockito.Answers.RETURNS_DEEP_STUBS;
-
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-
-import static com.netflix.hystrix.exception.HystrixRuntimeException.FailureType.TIMEOUT;
-
-import java.lang.reflect.Method;
 
 import java.net.URI;
 
@@ -29,6 +24,8 @@ import java.time.Clock;
 import java.time.Instant;
 
 import java.util.List;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import org.asynchttpclient.AsyncHttpClient;
 import org.asynchttpclient.BoundRequestBuilder;
@@ -36,6 +33,7 @@ import org.asynchttpclient.Param;
 import org.asynchttpclient.Realm;
 import org.asynchttpclient.Response;
 
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -47,22 +45,25 @@ import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.ArgumentMatchers;
 import org.mockito.Captor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Spy;
 
 import org.mockito.runners.MockitoJUnitRunner;
 
+import org.zalando.undertaking.oauth2.credentials.ClientCredentials;
 import org.zalando.undertaking.oauth2.credentials.RequestCredentials;
+import org.zalando.undertaking.oauth2.credentials.UserCredentials;
 
 import com.google.common.collect.ImmutableSet;
 
-import com.netflix.hystrix.exception.HystrixRuntimeException;
+import io.github.robwin.circuitbreaker.CircuitBreakerRegistry;
 
-import rx.Observable;
-import rx.Single;
+import io.reactivex.Single;
 
-import rx.observers.TestSubscriber;
+import io.reactivex.observers.TestObserver;
+
+import io.reactivex.plugins.RxJavaPlugins;
+
+import io.reactivex.schedulers.TestScheduler;
 
 @RunWith(MockitoJUnitRunner.class)
 public class AccessTokenRequestProviderTest {
@@ -76,14 +77,11 @@ public class AccessTokenRequestProviderTest {
     @Mock
     private AsyncHttpClient client;
 
-    @Mock(answer = RETURNS_DEEP_STUBS)
     private RequestCredentials credentials;
 
     @Mock
     private Clock clock;
 
-    @Spy
-    @InjectMocks
     private AccessTokenRequestProvider underTest;
 
     @Mock
@@ -99,18 +97,25 @@ public class AccessTokenRequestProviderTest {
 
     @Before
     public void initializeTest() {
+        this.underTest = spy(new AccessTokenRequestProvider(settings, client, clock,
+                    CircuitBreakerRegistry.ofDefaults()));
+
+        credentials = new RequestCredentials(new ClientCredentials("clientId", "clientSecret"),
+                new UserCredentials("user", "pass"));
+
         when(settings.getAccessTokenEndpoint()).thenReturn(URI.create("foo"));
-        when(credentials.getClientCredentials().getClientId()).thenReturn("clientId");
-        when(credentials.getClientCredentials().getClientSecret()).thenReturn("clientSecret");
-        when(credentials.getUserCredentials().getApplicationUsername()).thenReturn("user");
-        when(credentials.getUserCredentials().getApplicationPassword()).thenReturn("pass");
         when(client.preparePost(any())).thenReturn(requestBuilder);
         doReturn(Single.defer(() -> requestSingle)).when(underTest).createRequest(any());
 
         when(requestBuilder.setRealm(any(Realm.class))).thenReturn(requestBuilder);
-        when(requestBuilder.setHeader(any(), any())).thenReturn(requestBuilder);
+        when(requestBuilder.setHeader(any(), anyString())).thenReturn(requestBuilder);
         when(requestBuilder.addQueryParam(any(), any())).thenReturn(requestBuilder);
         when(requestBuilder.setFormParams(ArgumentMatchers.<List<Param>>any())).thenReturn(requestBuilder);
+    }
+
+    @After
+    public void tearDown() {
+        RxJavaPlugins.reset();
     }
 
     @Test
@@ -128,12 +133,12 @@ public class AccessTokenRequestProviderTest {
 
         final Single<AccessTokenResponse> requestSingle = underTest.requestAccessToken(credentials);
 
-        final AccessTokenResponse first = requestSingle.toBlocking().value();
+        final AccessTokenResponse first = requestSingle.blockingGet();
         verify(underTest).createRequest(any());
         assertThat(first.getAccessToken(), hasProperty("value", is("foo")));
         assertThat(first.getExpiryTime(), is(Instant.ofEpochSecond(5)));
 
-        final AccessTokenResponse second = requestSingle.toBlocking().value();
+        final AccessTokenResponse second = requestSingle.blockingGet();
         verify(underTest).createRequest(any());
         assertThat(second.getAccessToken(), hasProperty("value", is("foo")));
         assertThat(second.getExpiryTime(), is(Instant.ofEpochSecond(65)));
@@ -234,45 +239,33 @@ public class AccessTokenRequestProviderTest {
     }
 
     @Test
-    public void forwardsErrors() {
+    public void forwardsErrors() throws InterruptedException {
         final Exception error = new Exception("foo");
         requestSingle = Single.error(error);
 
-        final TestSubscriber<AccessTokenResponse> subscriber = new TestSubscriber<>();
-        underTest.requestAccessToken(credentials).subscribe(subscriber);
-        subscriber.awaitTerminalEvent();
-        subscriber.assertError(error);
+        underTest.requestAccessToken(credentials).test().await().assertError(error);
     }
 
     @Test
-    public void hystrixTimeout() {
-        requestSingle = Observable.<Response>never().toSingle();
+    public void timeout() throws Exception {
+        TestScheduler testScheduler = new TestScheduler();
+        RxJavaPlugins.setComputationSchedulerHandler((s) -> testScheduler);
 
-        expected.expect(HystrixRuntimeException.class);
-        expected.expect(hasProperty("failureType", is(TIMEOUT)));
+        when(clock.instant()).thenReturn(Instant.ofEpochSecond(0));
+        requestSingle = Single.never();
 
-        requestToken();
+        TestObserver<AccessTokenResponse> testObserver = underTest.requestAccessToken(credentials).test();
+
+        // Timeout is expected to be set < 1 min
+        testScheduler.advanceTimeBy(1, TimeUnit.MINUTES);
+        testObserver.assertError(TimeoutException.class);
     }
 
     @Test
-    public void doesntUnwrapNonHystrixExceptions() throws Exception {
-        final Method method = AccessTokenRequestProvider.class.getDeclaredMethod( //
-                "unwrapHystrixException", Throwable.class);
-        method.setAccessible(true);
-
-        final RuntimeException error = new RuntimeException("Oh no!");
-        assertThat(method.invoke(null, error), is(sameInstance(error)));
-    }
-
-    @Test
-    public void usesSpaceAsScopeSeparator() {
+    public void usesSpaceAsScopeSeparator() throws InterruptedException {
         when(settings.getAccessTokenScopes()).thenReturn(ImmutableSet.of("scope1", "scope2"));
 
-        final TestSubscriber<AccessTokenResponse> subscriber = new TestSubscriber<>();
-
-        underTest.requestAccessToken(credentials).subscribe(subscriber);
-
-        subscriber.awaitTerminalEvent();
+        underTest.requestAccessToken(credentials).test().await();
 
         verify(requestBuilder).setFormParams(formParamCaptor.capture());
 
@@ -283,6 +276,6 @@ public class AccessTokenRequestProviderTest {
     }
 
     private AccessTokenResponse requestToken() {
-        return underTest.requestAccessToken(credentials).toBlocking().value();
+        return underTest.requestAccessToken(credentials).blockingGet();
     }
 }

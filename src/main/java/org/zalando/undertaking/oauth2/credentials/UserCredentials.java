@@ -10,6 +10,13 @@ public class UserCredentials {
 
     private String applicationPassword;
 
+    public UserCredentials() { }
+
+    public UserCredentials(final String applicationUsername, final String applicationPassword) {
+        this.applicationUsername = applicationUsername;
+        this.applicationPassword = applicationPassword;
+    }
+
     public String getApplicationUsername() {
         return applicationUsername;
     }

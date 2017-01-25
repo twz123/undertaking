@@ -30,12 +30,12 @@ import org.zalando.undertaking.oauth2.AuthenticationInfo;
 import org.zalando.undertaking.oauth2.authorization.DefaultAuthorizationHandler.Settings;
 import org.zalando.undertaking.problem.ProblemHandlerBuilder;
 
+import io.reactivex.Single;
+
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
 
 import io.undertow.util.HttpString;
-
-import rx.Single;
 
 @RunWith(MockitoJUnitRunner.class)
 public class DefaultAuthorizationHandlerTest {
