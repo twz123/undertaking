@@ -22,7 +22,7 @@ public interface RxHttpExchangeScope extends HttpExchangeScope {
                 new Observer<T>() {
                 @Override
                 public void onSubscribe(final Disposable d) {
-                    child.onSubscribe(d);
+                    scope.runScoped(exchange, () -> child.onSubscribe(d));
                 }
 
                 @Override
@@ -53,7 +53,7 @@ public interface RxHttpExchangeScope extends HttpExchangeScope {
                 new SingleObserver<T>() {
                 @Override
                 public void onSubscribe(final Disposable d) {
-                    child.onSubscribe(d);
+                    scope.runScoped(exchange, () -> child.onSubscribe(d));
                 }
 
                 @Override

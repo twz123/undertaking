@@ -1,9 +1,9 @@
 package org.zalando.undertaking.inject.guice;
 
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
 
-import static org.junit.Assert.assertThat;
-
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 
@@ -22,32 +22,34 @@ import io.undertow.util.HttpString;
 public class HttpExchangeScopeModuleTest extends HttpExchangeScopeInjectionTestBase {
     @Rule
     public ExpectedException expectedException = ExpectedException.none();
+    private Injector injector;
+    private HttpExchangeScope underTest;
+
+    @Before
+    public void setUp() throws Exception {
+        injector = getInjector();
+        underTest = injector.getInstance(HttpExchangeScope.class);
+    }
 
     @Test
     public void injectsRequestScopedHeaderMap() throws Exception {
-        Injector injector = getInjector();
-        HttpExchangeScope scope = injector.getInstance(HttpExchangeScope.class);
         HttpServerExchange demoExchange = new HttpServerExchange(null);
-
         demoExchange.getRequestHeaders().put(HttpString.tryFromString("X-Some-Header"), "blah");
 
-        scope.scoped(exchange -> {
+        underTest.scoped(exchange -> {
                  TestSimpleHandler demoHandler = getNamedHandler(TestSimpleHandler.class, "testhandler", injector);
 
-                 assertThat(demoHandler.getHeaderMap(), is(not(nullValue())));
+                 assertThat(demoHandler.getHeaderMap(), not(nullValue()));
                  assertThat(demoHandler.getHeaderMap().getFirst("X-Some-Header"), equalTo("blah"));
              }).handleRequest(demoExchange);
     }
 
     @Test
     public void injectsRequestScopedHeaderMapOverTwoInjections() throws Exception {
-        Injector injector = getInjector();
-        HttpExchangeScope scope = injector.getInstance(HttpExchangeScope.class);
-
         HttpServerExchange demoExchange1 = new HttpServerExchange(null);
         demoExchange1.getRequestHeaders().put(HttpString.tryFromString("X-Some-Header"), "blah");
 
-        scope.scoped(exchange -> {
+        underTest.scoped(exchange -> {
                  TestSimpleHandler demoHandler = getNamedHandler(TestSimpleHandler.class, "testhandler", injector);
 
                  assertThat(demoHandler.getHeaderMap(), is(not(nullValue())));
@@ -56,7 +58,8 @@ public class HttpExchangeScopeModuleTest extends HttpExchangeScopeInjectionTestB
 
         HttpServerExchange demoExchange2 = new HttpServerExchange(null);
         demoExchange2.getRequestHeaders().put(HttpString.tryFromString("X-Some-Header"), "potter");
-        scope.scoped(exchange -> {
+
+        underTest.scoped(exchange -> {
                  TestSimpleHandler demoHandler = getNamedHandler(TestSimpleHandler.class, "testhandler", injector);
 
                  assertThat(demoHandler.getHeaderMap(), is(not(nullValue())));
@@ -66,12 +69,9 @@ public class HttpExchangeScopeModuleTest extends HttpExchangeScopeInjectionTestB
 
     @Test
     public void injectsExchange() throws Exception {
-        Injector injector = getInjector();
-        HttpExchangeScope scope = injector.getInstance(HttpExchangeScope.class);
-
         HttpServerExchange demoExchange = new HttpServerExchange(null);
 
-        scope.scoped(exchange -> {
+        underTest.scoped(exchange -> {
                  TestAllInjectedHandler demoHandler = getNamedHandler(TestAllInjectedHandler.class,
                          "testAllInjectedHandler", injector);
 
@@ -82,12 +82,9 @@ public class HttpExchangeScopeModuleTest extends HttpExchangeScopeInjectionTestB
 
     @Test
     public void injectsScopedExecutor() throws Exception {
-        Injector injector = getInjector();
-        HttpExchangeScope scope = injector.getInstance(HttpExchangeScope.class);
-
         HttpServerExchange demoExchange = new HttpServerExchange(null);
 
-        scope.scoped(exchange -> {
+        underTest.scoped(exchange -> {
                  TestAllInjectedHandler demoHandler = getNamedHandler(TestAllInjectedHandler.class,
                          "testAllInjectedHandler", injector);
 
@@ -95,9 +92,13 @@ public class HttpExchangeScopeModuleTest extends HttpExchangeScopeInjectionTestB
              }).handleRequest(demoExchange);
     }
 
+    /**
+     * Verifies that object explicitly bound in the `HttpExchangeScope` can not be accessed outside.
+     *
+     * @see #getInjector()
+     */
     @Test
     public void throwsIfHttpExchangeScopedIsUsedOutOfScope() {
-        Injector injector = getInjector();
         expectedException.expectCause(instanceOf(OutOfScopeException.class));
         getNamedHandler(TestSimpleHandler.class, "testhandler", injector);
     }

@@ -24,53 +24,47 @@ public class RxHttpExchangeScopeTest extends HttpExchangeScopeInjectionTestBase 
     @Rule
     public ExpectedException expectedException = ExpectedException.none();
     private Injector injector;
+    private RxHttpExchangeScope underTest;
 
     @Before
     public void setUp() throws Exception {
         injector = getInjector();
+        underTest = injector.getInstance(RxHttpExchangeScope.class);
     }
 
     @Test
     public void throwsWithoutScopedExcutionObservable() {
-        Injector injector = getInjector();
-
-        getSimpleHandlerSingle(injector).map(TestSimpleHandler::getHeaderMap)                     //
-                                        .test()                                                   //
-                                        .assertError(err ->                                       //
-                                                 isExceptionWithCause(err, ProvisionException.class,
-                                                    OutOfScopeException.class));                  //
+        getSimpleHandlerSingle().map(TestSimpleHandler::getHeaderMap)                     //
+                                .test()                                                   //
+                                .assertError(err ->                                       //
+                                    isExceptionWithCause(err, ProvisionException.class,   //
+                                                         OutOfScopeException.class));
     }
 
     @Test
     public void scopesOnSuccessObservable() {
-        Injector injector = getInjector();
-        RxHttpExchangeScope scope = injector.getInstance(RxHttpExchangeScope.class);
-
         HttpServerExchange demoExchange = new HttpServerExchange(null);
         demoExchange.getRequestHeaders().put(HttpString.tryFromString("X-Some-Header"), "blah");
 
         Observable.just(1)                                                         //
-                  .lift(scope.scoped(demoExchange))                                //
-                  .flatMap((e) -> getSimpleHandlerSingle(injector).toObservable()) //
+                  .lift(underTest.scoped(demoExchange))                            //
+                  .flatMap((e) -> getSimpleHandlerSingle().toObservable())         //
                   .map(TestSimpleHandler::getHeaderMap)                            //
                   .test()                                                          //
                   .assertComplete()                                                //
                   .assertValue(headers ->                                          //
-                           headers.getFirst("X-Some-Header").equals("blah"));      //
+                           headers.getFirst("X-Some-Header").equals("blah"));
 
     }
 
     @Test
     public void scopesErrorObservable() {
-        RxHttpExchangeScope scope = injector.getInstance(RxHttpExchangeScope.class);
-
         HttpServerExchange demoExchange = new HttpServerExchange(null);
         demoExchange.getRequestHeaders().put(HttpString.tryFromString("X-Some-Header"), "blah");
 
         Observable.error(new RuntimeException("trigger error")) //
-                  .lift(scope.scoped(demoExchange))             //
+                  .lift(underTest.scoped(demoExchange))         //
                   .onErrorResumeNext(throwable -> {             //
-
                       TestSimpleHandler testhandler =                                                        //
                           getNamedHandler(TestSimpleHandler.class, "testhandler", injector);                 //
                       return Observable.just(testhandler.getHeaderMap());                                    //
@@ -79,49 +73,42 @@ public class RxHttpExchangeScopeTest extends HttpExchangeScopeInjectionTestBase 
                   .test()                                                                                    //
                   .assertComplete()                                                                          //
                   .assertValue(headers ->                                                                    //
-                           headers.getFirst("X-Some-Header").equals("blah"));                                //
+                           headers.getFirst("X-Some-Header").equals("blah"));
 
     }
 
     @Test
     public void throwsWithoutScopedExcutionSingle() {
-        Injector injector = getInjector();
-
-        getSimpleHandlerSingle(injector).map(TestSimpleHandler::getHeaderMap)                     //
-                                        .test()                                                   //
-                                        .assertError(err ->                                       //
-                                                 isExceptionWithCause(err, ProvisionException.class,
-                                                    OutOfScopeException.class));                  //
+        getSimpleHandlerSingle().map(TestSimpleHandler::getHeaderMap)                                //
+                                .test()                                                              //
+                                .assertError(err ->                                                  //
+                                                 isExceptionWithCause(err, ProvisionException.class, //
+                                                                      OutOfScopeException.class));
     }
 
     @Test
     public void scopesOnSuccessSingle() {
-        Injector injector = getInjector();
-        RxHttpExchangeScope scope = injector.getInstance(RxHttpExchangeScope.class);
-
         HttpServerExchange demoExchange = new HttpServerExchange(null);
         demoExchange.getRequestHeaders().put(HttpString.tryFromString("X-Some-Header"), "blah");
 
         Single.just(1)                                              //
-              .lift(scope.scopedSingle(demoExchange))               //
-              .flatMap((e) -> getSimpleHandlerSingle(injector))     //
+              .lift(underTest.scopedSingle(demoExchange))               //
+              .flatMap((e) -> getSimpleHandlerSingle())             //
               .map(TestSimpleHandler::getHeaderMap)                 //
               .test()                                               //
               .assertComplete()                                     //
               .assertValue(headers ->                               //
-                       headers.getFirst("X-Some-Header").equals("blah")); //
+                       headers.getFirst("X-Some-Header").equals("blah"));
 
     }
 
     @Test
     public void scopesErrorSingle() {
-        RxHttpExchangeScope scope = injector.getInstance(RxHttpExchangeScope.class);
-
         HttpServerExchange demoExchange = new HttpServerExchange(null);
         demoExchange.getRequestHeaders().put(HttpString.tryFromString("X-Some-Header"), "blah");
 
         Single.error(new RuntimeException("trigger error")) //
-              .lift(scope.scopedSingle(demoExchange))       //
+              .lift(underTest.scopedSingle(demoExchange))   //
               .onErrorResumeNext(throwable -> {             //
 
                   TestSimpleHandler testhandler =                                                        //
@@ -132,11 +119,11 @@ public class RxHttpExchangeScopeTest extends HttpExchangeScopeInjectionTestBase 
               .test()                                                                                    //
               .assertComplete()                                                                          //
               .assertValue(headers ->                                                                    //
-                       headers.getFirst("X-Some-Header").equals("blah"));                                //
+                       headers.getFirst("X-Some-Header").equals("blah"));
 
     }
 
-    private Single<TestSimpleHandler> getSimpleHandlerSingle(final Injector injector) {
+    private Single<TestSimpleHandler> getSimpleHandlerSingle() {
         return Single.fromCallable(() -> getNamedHandler(TestSimpleHandler.class, "testhandler", injector));
     }
 
