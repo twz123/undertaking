@@ -6,6 +6,7 @@ import javax.inject.Singleton;
 
 import org.zalando.undertaking.metrics.DefaultMetricsResponderConfig;
 import org.zalando.undertaking.metrics.MetricRegistryTimerProvider;
+import org.zalando.undertaking.metrics.MetricsPublishingCircuitBreakerRegistry;
 import org.zalando.undertaking.metrics.MetricsResponder;
 import org.zalando.undertaking.metrics.PathTemplateBasedMetricsCollector;
 import org.zalando.undertaking.metrics.PathTemplateBasedMetricsHandler;
@@ -19,10 +20,13 @@ import com.codahale.metrics.Timer;
 import com.google.inject.PrivateModule;
 import com.google.inject.Provides;
 
+import io.github.robwin.circuitbreaker.CircuitBreakerRegistry;
+
 public class SimpleHttpMetricsModule extends PrivateModule {
 
     @Override
     protected void configure() {
+        bind(CircuitBreakerRegistry.class).to(MetricsPublishingCircuitBreakerRegistry.class);
         bind(Clock.class).toProvider(Clock::defaultClock);
         bind(MetricFilter.class).toInstance(MetricFilter.ALL);
 
