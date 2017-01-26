@@ -30,8 +30,7 @@ public class CircuitBreakerDropwizardMetricsTest {
         metricRegistry = new MetricRegistry();
 
         /* Usage of smaller ring buffer than the default so that the values that are computed only with a full ring
-         * buffer
-         * are available earlier */
+         * buffer are available earlier */
         defaultBreaker = CircuitBreaker.of("defaultBreaker",
                 CircuitBreakerConfig.custom().ringBufferSizeInClosedState(DEFAULT_BREAKER_RINBGUFFER_SIZE).build());
 
@@ -114,13 +113,15 @@ public class CircuitBreakerDropwizardMetricsTest {
     public void publishesTimings() {
         defaultBreaker.onSuccess(Duration.ofMillis(123));
 
-        Histogram histogram = metricRegistry.getHistograms(MetricFilter.ALL).get("circuitbreaker.defaultBreaker.timings");
+        Histogram histogram = metricRegistry.getHistograms(MetricFilter.ALL).get(
+                "circuitbreaker.defaultBreaker.timings");
 
         assertThat(histogram).as("histogram 'circuitbreaker.defaultBreaker.timings'").isNotNull();
 
         // Min is an arbitrary choice as we only care if *anything* was updated. We're not here to test Dropwizard
         // Metrics.
-        assertThat(histogram.getSnapshot().getMin()).as("histogram 'circuitbreaker.defaultBreaker.timings' min value").isEqualTo(123);
+        assertThat(histogram.getSnapshot().getMin()).as("histogram 'circuitbreaker.defaultBreaker.timings' min value")
+                                                    .isEqualTo(123);
     }
 
     @Test

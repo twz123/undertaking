@@ -3,13 +3,11 @@ package org.zalando.undertaking.metrics;
 import static org.mockito.ArgumentMatchers.eq;
 
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.withSettings;
 
 import org.junit.Before;
 import org.junit.Test;
-
-import org.mockito.Mockito;
 
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
@@ -24,7 +22,7 @@ public class PathTemplateBasedMetricsHandlerTest {
     public void setUp() throws Exception {
         collector = mock(PathTemplateBasedMetricsCollector.class);
         underTest = new PathTemplateBasedMetricsHandler(collector);
-        exchange = mock(HttpServerExchange.class, withSettings().defaultAnswer(Mockito.CALLS_REAL_METHODS));
+        exchange = spy(new HttpServerExchange(null));
     }
 
     @Test

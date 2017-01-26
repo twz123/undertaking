@@ -7,14 +7,14 @@ import static javaslang.API.Match;
 
 import static javaslang.Predicates.instanceOf;
 
-import java.util.Arrays;
 import java.util.List;
-import java.util.function.Supplier;
 
 import com.codahale.metrics.Gauge;
 import com.codahale.metrics.Histogram;
 import com.codahale.metrics.Meter;
 import com.codahale.metrics.MetricRegistry;
+
+import com.google.common.collect.ImmutableList;
 
 import io.github.robwin.circuitbreaker.CircuitBreaker;
 import io.github.robwin.circuitbreaker.event.CircuitBreakerOnErrorEvent;
@@ -22,8 +22,11 @@ import io.github.robwin.circuitbreaker.event.CircuitBreakerOnIgnoredErrorEvent;
 import io.github.robwin.circuitbreaker.event.CircuitBreakerOnSuccessEvent;
 
 public class CircuitBreakerDropwizardMetrics {
-    private static final List<Class> INTERESTING_EVENTS = Arrays.asList(CircuitBreakerOnSuccessEvent.class,
-            CircuitBreakerOnErrorEvent.class, CircuitBreakerOnIgnoredErrorEvent.class);
+    private static final List<Class> INTERESTING_EVENTS = ImmutableList.of( //
+            CircuitBreakerOnSuccessEvent.class,                             //
+            CircuitBreakerOnErrorEvent.class,                               //
+            CircuitBreakerOnIgnoredErrorEvent.class);
+
     private static final String PREFIX = "circuitbreaker";
 
     private CircuitBreaker breaker;
@@ -40,6 +43,7 @@ public class CircuitBreakerDropwizardMetrics {
 
     private void doRegister() {
         if (registry.getMetrics().containsKey(getPrefixedMetricName("state"))) {
+
             // Do not register or subscribe to the event stream more than once.
             return;
         }
@@ -76,8 +80,8 @@ public class CircuitBreakerDropwizardMetrics {
                .subscribe();
     }
 
-    private <T> void registerGauge(final String name, final Supplier<T> fn) {
-        registry.register(getPrefixedMetricName(name), (Gauge<T>) fn::get);
+    private <T> void registerGauge(final String name, final Gauge<T> fn) {
+        registry.register(getPrefixedMetricName(name), fn);
     }
 
     private String getPrefixedMetricName(final String name) {

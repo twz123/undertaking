@@ -1,6 +1,10 @@
 package org.zalando.undertaking.metrics;
 
+import static java.util.Objects.requireNonNull;
+
 import java.util.function.Supplier;
+
+import javax.inject.Inject;
 
 import com.codahale.metrics.MetricRegistry;
 
@@ -11,23 +15,22 @@ import io.github.robwin.circuitbreaker.CircuitBreakerRegistry;
 import javaslang.collection.Seq;
 
 /**
- * All circuit breakers created by this registry will publish Metrics to the provided MetricsRegistry.
- * Creation of the actual circuit breakers is delegated to the provided CircuitBreakerRegistry
+ * All circuit breakers created by this registry will publish Metrics to the provided MetricsRegistry. Creation of the
+ * actual circuit breakers is delegated to the provided CircuitBreakerRegistry
  *
- * @see CircuitBreakerDropwizardMetrics
+ * @see  CircuitBreakerDropwizardMetrics Published Metrics per circuit breaker are:
  *
- * Published Metrics per circuit breaker are:
- * <ul>
- *  <li>Circuit Breaker State</li>
- *  <li>Current Timestamp
- *  <li>Failure Rate</li>
- *  <li># of buffered calls</li>
- *  <li># of failed calls</li>
- *  <li># of successful calls</li>
- *  <li># of calls that were not permitted due to the circuit breaker state</li>
- *  <li>max number of buffered calls</li>
- *  <li>request timings as `Histogram`</li>
- * </ul>
+ *       <ul>
+ *         <li>Circuit Breaker State</li>
+ *         <li>Current Timestamp</li>
+ *         <li>Failure Rate</li>
+ *         <li># of buffered calls</li>
+ *         <li># of failed calls</li>
+ *         <li># of successful calls</li>
+ *         <li># of calls that were not permitted due to the circuit breaker state</li>
+ *         <li>max number of buffered calls</li>
+ *         <li>request timings as `Histogram`</li>
+ *       </ul>
  */
 public class MetricsPublishingCircuitBreakerRegistry implements CircuitBreakerRegistry {
     private CircuitBreakerRegistry delegate;
@@ -35,14 +38,16 @@ public class MetricsPublishingCircuitBreakerRegistry implements CircuitBreakerRe
 
     /**
      * Creates an instance of this registry.
-     * @param delegate The actual circuit breaker
-     *                 registry to which this registry delegates circuit breaker creation
-     * @param metricRegistry The metric registry to which metrics are published.
+     *
+     * @param  delegate        The actual circuit breaker registry to which this registry delegates circuit breaker
+     *                         creation
+     * @param  metricRegistry  The metric registry to which metrics are published.
      */
+    @Inject
     public MetricsPublishingCircuitBreakerRegistry(final CircuitBreakerRegistry delegate,
             final MetricRegistry metricRegistry) {
-        this.delegate = delegate;
-        this.metricRegistry = metricRegistry;
+        this.delegate = requireNonNull(delegate);
+        this.metricRegistry = requireNonNull(metricRegistry);
     }
 
     @Override

@@ -14,9 +14,11 @@ import org.zalando.undertaking.metrics.TimerProvider;
 
 import com.codahale.metrics.Clock;
 import com.codahale.metrics.MetricFilter;
+import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.SlidingTimeWindowReservoir;
 import com.codahale.metrics.Timer;
 
+import com.google.inject.Exposed;
 import com.google.inject.PrivateModule;
 import com.google.inject.Provides;
 
@@ -26,7 +28,6 @@ public class SimpleHttpMetricsModule extends PrivateModule {
 
     @Override
     protected void configure() {
-        bind(CircuitBreakerRegistry.class).to(MetricsPublishingCircuitBreakerRegistry.class);
         bind(Clock.class).toProvider(Clock::defaultClock);
         bind(MetricFilter.class).toInstance(MetricFilter.ALL);
 
@@ -46,4 +47,10 @@ public class SimpleHttpMetricsModule extends PrivateModule {
         return new Timer(new SlidingTimeWindowReservoir(1, TimeUnit.MINUTES));
     }
 
+    @Provides
+    @Exposed
+    @Singleton
+    CircuitBreakerRegistry provideCircuitBreakerRegistry(final MetricRegistry registry) {
+        return new MetricsPublishingCircuitBreakerRegistry(CircuitBreakerRegistry.ofDefaults(), registry);
+    }
 }
