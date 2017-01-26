@@ -7,9 +7,9 @@ import io.undertow.server.HttpServerExchange;
 
 import io.undertow.util.HeaderMap;
 
-public final class UntertowHttpResponse extends UndertowHttpMessage implements HttpResponse, RawHttpResponse {
+public final class UndertowHttpResponse extends UndertowHttpMessage implements HttpResponse, RawHttpResponse {
 
-    public UntertowHttpResponse(final HttpServerExchange exchange) {
+    public UndertowHttpResponse(final HttpServerExchange exchange) {
         super(exchange);
     }
 

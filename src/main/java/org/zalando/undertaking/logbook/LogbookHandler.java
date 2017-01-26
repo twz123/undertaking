@@ -74,7 +74,7 @@ public class LogbookHandler implements HttpHandler, ExchangeCompletionListener {
     @Override
     public void exchangeEvent(final HttpServerExchange exchange, final NextListener nextListener) {
         try {
-            exchange.getAttachment(correlatorKey).write(new UntertowHttpResponse(exchange));
+            exchange.getAttachment(correlatorKey).write(new UndertowHttpResponse(exchange));
         } catch (final IOException e) {
             LOG.error("Failed to log HTTP response: [{}]", e.getMessage(), e);
         } finally {
