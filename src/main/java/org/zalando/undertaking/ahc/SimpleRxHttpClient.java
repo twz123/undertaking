@@ -5,11 +5,11 @@ import static java.util.Objects.requireNonNull;
 import org.asynchttpclient.AsyncHttpClient;
 import org.asynchttpclient.Request;
 
-import org.asynchttpclient.extras.rxjava.single.AsyncHttpSingle;
+import org.asynchttpclient.extras.rxjava2.single.AsyncHttpSingle;
 
 import com.google.common.base.MoreObjects;
 
-import rx.Single;
+import io.reactivex.Single;
 
 /**
  * Straight-forward implementation of {@code RxHttpClient} that uses an {@code AsyncHttpClient} instance to actually

@@ -2,11 +2,7 @@ package org.zalando.undertaking.ahc;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 
-import static org.hamcrest.Matchers.contains;
-import static org.hamcrest.Matchers.hasSize;
-import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.not;
-import static org.hamcrest.Matchers.stringContainsInOrder;
+import static org.hamcrest.Matchers.*;
 
 import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
@@ -16,12 +12,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 
-import org.asynchttpclient.AsyncHandler;
-import org.asynchttpclient.AsyncHttpClient;
-import org.asynchttpclient.Dsl;
-import org.asynchttpclient.ListenableFuture;
-import org.asynchttpclient.Request;
-import org.asynchttpclient.Response;
+import org.asynchttpclient.*;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -35,7 +26,7 @@ import org.mockito.Mock;
 
 import org.mockito.runners.MockitoJUnitRunner;
 
-import rx.Single;
+import io.reactivex.Single;
 
 @RunWith(MockitoJUnitRunner.class)
 public class SimpleRxHttpClientTest {
@@ -52,11 +43,19 @@ public class SimpleRxHttpClientTest {
     @InjectMocks
     private SimpleRxHttpClient underTest;
 
+    @Mock
+    private Response mockResponse;
+
+    @Mock
+    private HttpResponseStatus status;
+
     @Before
     public void initializeTest() {
         when(ahc.executeRequest(requestCaptor.capture(), handlerCaptor.capture())).then(invocation -> {
             final AsyncHandler<Object> argument = invocation.getArgument(1);
-            return new CompletedFuture<>(argument.onCompleted());
+            argument.onStatusReceived(status);
+            argument.onCompleted();
+            return new CompletedFuture<>(new ReturnMockResponseAsyncHandler());
         });
     }
 
@@ -69,20 +68,90 @@ public class SimpleRxHttpClientTest {
     public void executesRequest() {
         final Request request = Dsl.get("http://example.com").build();
 
-        final Single<Response> requestSingle = underTest.prepareRequest(request);
+        final Single<Response> requestSingle = underTest.prepareRequest(request, ReturnMockResponseAsyncHandler::new);
         verifyZeroInteractions(ahc);
 
-        requestSingle.toBlocking().value();
+        requestSingle.blockingGet();
 
         assertThat(requestCaptor.getAllValues(), contains(request));
         assertThat(handlerCaptor.getAllValues(), hasSize(1));
 
         final AsyncHandler<?> lastHandler = handlerCaptor.getValue();
 
-        requestSingle.toBlocking().value();
+        requestSingle.blockingGet();
 
         assertThat(requestCaptor.getAllValues(), contains(request, request));
         assertThat(handlerCaptor.getAllValues(), contains(is(lastHandler), not(lastHandler)));
+    }
+
+    @Test
+    public void executesRequestFromBuilder() {
+        final RequestBuilder requestBuilder = Dsl.get("http://example.com");
+        final Request request = requestBuilder.build();
+
+        final Single<Response> requestSingle = underTest.prepareRequest(requestBuilder,
+                ReturnMockResponseAsyncHandler::new);
+        verifyZeroInteractions(ahc);
+
+        requestSingle.blockingGet();
+
+        assertThat(requestCaptor.getAllValues(), contains(samePropertyValuesAs(request)));
+        assertThat(handlerCaptor.getAllValues(), hasSize(1));
+
+        final AsyncHandler<?> lastHandler = handlerCaptor.getValue();
+
+        requestSingle.blockingGet();
+
+        assertThat(requestCaptor.getAllValues(),
+            contains(samePropertyValuesAs(request), samePropertyValuesAs(request)));
+        assertThat(handlerCaptor.getAllValues(), contains(is(lastHandler), not(lastHandler)));
+    }
+
+    @Test
+    public void executesRequestWithDefaultHandler() {
+        final Request request = Dsl.get("http://example.com").build();
+
+        final Single<Response> requestSingle = underTest.prepareRequest(request);
+        verifyZeroInteractions(ahc);
+
+        requestSingle.blockingGet();
+
+        assertThat(requestCaptor.getAllValues(), contains(request));
+        assertThat(handlerCaptor.getAllValues(), hasSize(1));
+
+        final AsyncHandler<?> lastHandler = handlerCaptor.getValue();
+
+        requestSingle.blockingGet();
+
+        assertThat(requestCaptor.getAllValues(), contains(request, request));
+        assertThat(handlerCaptor.getAllValues(), contains(is(lastHandler), not(lastHandler)));
+    }
+
+    @Test
+    public void executesRequestFromBuilderWithDefaultHandler() {
+        final RequestBuilder requestBuilder = Dsl.get("http://example.com");
+        final Request request = requestBuilder.build();
+
+        final Single<Response> requestSingle = underTest.prepareRequest(requestBuilder);
+        verifyZeroInteractions(ahc);
+
+        requestSingle.blockingGet();
+
+        assertThat(requestCaptor.getAllValues(), contains(samePropertyValuesAs(request)));
+        assertThat(handlerCaptor.getAllValues(), hasSize(1));
+
+        final AsyncHandler<?> lastHandler = handlerCaptor.getValue();
+
+        requestSingle.blockingGet();
+
+        assertThat(requestCaptor.getAllValues(),
+            contains(samePropertyValuesAs(request), samePropertyValuesAs(request)));
+        assertThat(handlerCaptor.getAllValues(), contains(is(lastHandler), not(lastHandler)));
+    }
+
+    @Test
+    public void isDefaultImplementationOfRxHttpClient() {
+        assertThat(RxHttpClient.using(ahc), instanceOf(SimpleRxHttpClient.class));
     }
 
     private static final class CompletedFuture<V> implements ListenableFuture<V> {
@@ -142,6 +211,31 @@ public class SimpleRxHttpClientTest {
         public ListenableFuture<V> addListener(final Runnable listener, final Executor exec) {
             exec.execute(listener);
             return this;
+        }
+    }
+
+    private class ReturnMockResponseAsyncHandler implements AsyncHandler<Response> {
+        @Override
+        public void onThrowable(final Throwable throwable) { }
+
+        @Override
+        public State onBodyPartReceived(final HttpResponseBodyPart httpResponseBodyPart) throws Exception {
+            return State.CONTINUE;
+        }
+
+        @Override
+        public State onStatusReceived(final HttpResponseStatus httpResponseStatus) throws Exception {
+            return State.CONTINUE;
+        }
+
+        @Override
+        public State onHeadersReceived(final HttpResponseHeaders httpResponseHeaders) throws Exception {
+            return State.CONTINUE;
+        }
+
+        @Override
+        public Response onCompleted() throws Exception {
+            return mockResponse;
         }
     }
 }

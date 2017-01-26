@@ -1,8 +1,8 @@
 package org.zalando.undertaking.ahc;
 
-import org.asynchttpclient.AsyncHandler;
+import java.util.function.Supplier;
 
-import rx.functions.Func0;
+import org.asynchttpclient.AsyncHandler;
 
 /**
  * Supplies {@link AsyncHandler} instances to be used when executing HTTP requests.
@@ -14,11 +14,11 @@ import rx.functions.Func0;
  *              returned by this supplier
  */
 @FunctionalInterface
-public interface AsyncHandlerSupplier<T> extends Func0<AsyncHandler<T>> {
+public interface AsyncHandlerSupplier<T> extends Supplier<AsyncHandler<T>> {
 
     /**
      * Supplies an {@code AsyncHandler} instance that is ready to be used to process a HTTP request.
      */
     @Override
-    AsyncHandler<T> call();
+    AsyncHandler<T> get();
 }
