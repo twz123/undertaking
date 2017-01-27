@@ -6,6 +6,7 @@ import javax.inject.Singleton;
 
 import org.zalando.undertaking.metrics.DefaultMetricsResponderConfig;
 import org.zalando.undertaking.metrics.MetricRegistryTimerProvider;
+import org.zalando.undertaking.metrics.MetricsPublishingCircuitBreakerRegistry;
 import org.zalando.undertaking.metrics.MetricsResponder;
 import org.zalando.undertaking.metrics.PathTemplateBasedMetricsCollector;
 import org.zalando.undertaking.metrics.PathTemplateBasedMetricsHandler;
@@ -13,11 +14,15 @@ import org.zalando.undertaking.metrics.TimerProvider;
 
 import com.codahale.metrics.Clock;
 import com.codahale.metrics.MetricFilter;
+import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.SlidingTimeWindowReservoir;
 import com.codahale.metrics.Timer;
 
+import com.google.inject.Exposed;
 import com.google.inject.PrivateModule;
 import com.google.inject.Provides;
+
+import io.github.robwin.circuitbreaker.CircuitBreakerRegistry;
 
 public class SimpleHttpMetricsModule extends PrivateModule {
 
@@ -42,4 +47,10 @@ public class SimpleHttpMetricsModule extends PrivateModule {
         return new Timer(new SlidingTimeWindowReservoir(1, TimeUnit.MINUTES));
     }
 
+    @Provides
+    @Exposed
+    @Singleton
+    CircuitBreakerRegistry provideCircuitBreakerRegistry(final MetricRegistry registry) {
+        return new MetricsPublishingCircuitBreakerRegistry(CircuitBreakerRegistry.ofDefaults(), registry);
+    }
 }

@@ -3,8 +3,6 @@ package org.zalando.undertaking.metrics;
 import static java.util.Objects.requireNonNull;
 
 import java.util.concurrent.TimeUnit;
-import java.util.function.Function;
-import java.util.regex.Pattern;
 
 import javax.inject.Inject;
 
@@ -15,7 +13,6 @@ import com.codahale.metrics.Clock;
 import com.codahale.metrics.Timer;
 
 import com.google.common.base.Ascii;
-import com.google.common.base.CharMatcher;
 
 import io.undertow.UndertowOptions;
 
@@ -32,10 +29,7 @@ import io.undertow.util.PathTemplateMatch;
  * @see  io.undertow.server.handlers.PathTemplateHandler
  */
 public final class PathTemplateBasedMetricsCollector implements ExchangeCompletionListener {
-
     private static final Logger LOG = LoggerFactory.getLogger(PathTemplateBasedMetricsCollector.class);
-
-    private final Function<String, String> pathToMetricsSuffix = pathToMetricsSuffix();
 
     private final TimerProvider timerProvider;
     private final Clock clock;
@@ -105,30 +99,11 @@ public final class PathTemplateBasedMetricsCollector implements ExchangeCompleti
             return "root";
         }
 
-        return pathToMetricsSuffix.apply(path);
+        return MetricNameNormalizer.normalize(path);
     }
 
     private static String getPath(final HttpServerExchange exchange) {
         final PathTemplateMatch match = exchange.getAttachment(PathTemplateMatch.ATTACHMENT_KEY);
         return match == null ? null : match.getMatchedTemplate();
-    }
-
-    private static Function<String, String> pathToMetricsSuffix() {
-
-        final CharMatcher curlyBraces = CharMatcher.anyOf("{}");
-        final Pattern slashDashOrDashSlash = Pattern.compile("/-|-/");
-        final CharMatcher slash = CharMatcher.is('/');
-        final CharMatcher dot = CharMatcher.is('.');
-        final CharMatcher dashes = CharMatcher.anyOf("-_");
-
-        return
-            value -> {
-            value = curlyBraces.replaceFrom(value, '-');
-            value = slashDashOrDashSlash.matcher(value).replaceAll("/");
-            value = slash.replaceFrom(value, '.');
-            value = dot.collapseFrom(value, '.');
-            value = dot.trimFrom(value);
-            return dashes.trimFrom(value);
-        };
     }
 }
