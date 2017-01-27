@@ -15,7 +15,7 @@ public class AsyncHttpObservableTest {
     @Test
     public void testToObservableNoError() {
         try(AsyncHttpClient client = asyncHttpClient()) {
-            AsyncHttpObservable.toObservable(() -> client.prepareGet("http://gatling.io")).test()
+            AsyncHttpObservable.toObservable(() -> client.prepareGet("http://httpstat.us/200")).test()
                                .awaitDone(5, TimeUnit.SECONDS).assertValue(resp ->
                                        resp.getStatusCode() == 200);
         } catch (Exception e) {
@@ -26,7 +26,7 @@ public class AsyncHttpObservableTest {
     @Test
     public void testToObservableError() {
         try(AsyncHttpClient client = asyncHttpClient()) {
-            AsyncHttpObservable.toObservable(() -> client.prepareGet("http://gatling.io/ttfn")).test()
+            AsyncHttpObservable.toObservable(() -> client.prepareGet("http://httpstat.us/404")).test()
                                .awaitDone(5, TimeUnit.SECONDS).assertValue(resp ->
                                        resp.getStatusCode() == 404);
         } catch (Exception e) {
@@ -37,7 +37,7 @@ public class AsyncHttpObservableTest {
     @Test
     public void testObserveNoError() {
         try(AsyncHttpClient client = asyncHttpClient()) {
-            AsyncHttpObservable.observe(() -> client.prepareGet("http://gatling.io/")).test()
+            AsyncHttpObservable.observe(() -> client.prepareGet("http://httpstat.us/200")).test()
                                .awaitDone(5, TimeUnit.SECONDS).assertValue(resp ->
                                        resp.getStatusCode() == 200);
         } catch (Exception e) {
@@ -48,7 +48,7 @@ public class AsyncHttpObservableTest {
     @Test
     public void testObserveError() {
         try(AsyncHttpClient client = asyncHttpClient()) {
-            AsyncHttpObservable.observe(() -> client.prepareGet("http://gatling.io/ttfn")).test()
+            AsyncHttpObservable.observe(() -> client.prepareGet("http://httpstat.us/404")).test()
                                .awaitDone(5, TimeUnit.SECONDS).assertValue(resp ->
                                        resp.getStatusCode() == 404);
         } catch (Exception e) {
@@ -59,11 +59,11 @@ public class AsyncHttpObservableTest {
     @Test
     public void testObserveMultiple() {
         try(AsyncHttpClient client = asyncHttpClient()) {
-            Observable.merge(AsyncHttpObservable.observe(() -> client.prepareGet("http://gatling.io")),
+            Observable.merge(AsyncHttpObservable.observe(() -> client.prepareGet("http://httpstat.us/200")),
                           AsyncHttpObservable.observe(() ->
-                                  client.prepareGet("http://www.wisc.edu").setFollowRedirect(true)),
+                                  client.prepareGet("http://httpstat.us/302").setFollowRedirect(true)),
                           AsyncHttpObservable.observe(() ->
-                                  client.prepareGet("http://www.umn.edu").setFollowRedirect(true))).test()
+                                  client.prepareGet("http://httpstat.us/303").setFollowRedirect(true))).test()
                       .awaitDone(5, TimeUnit.SECONDS).assertValueAt(0, resp -> resp.getStatusCode() == 200)
                       .assertValueAt(1, resp -> resp.getStatusCode() == 200).assertValueAt(2,
                           resp -> resp.getStatusCode() == 200);
