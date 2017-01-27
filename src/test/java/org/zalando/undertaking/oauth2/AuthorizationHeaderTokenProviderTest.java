@@ -10,24 +10,23 @@ import io.undertow.util.Headers;
 public class AuthorizationHeaderTokenProviderTest {
     @Test
     public void extractsTokenHeader() {
-        HeaderMap headerMapWithAuthorization = new HeaderMap();
-        headerMapWithAuthorization.put(Headers.AUTHORIZATION, "Bearer test-token");
+        HeaderMap headerMap = new HeaderMap();
+        headerMap.put(Headers.AUTHORIZATION, "Bearer test-token");
 
-        new AuthorizationHeaderTokenProvider(headerMapWithAuthorization)
-            .get()
-            .test()
-            .awaitDone(10, TimeUnit.SECONDS)
-            .assertValue(AccessToken.of("Bearer", "test-token"));
+        new AuthorizationHeaderTokenProvider(headerMap).get()                           //
+                                                       .test()                          //
+                                                       .awaitDone(10, TimeUnit.SECONDS) //
+                                                       .assertValue(AccessToken.of("Bearer", "test-token"));
     }
 
     @Test
     public void extractsTokenHeaderNoToken() {
-        HeaderMap emptyHeaderMap = new HeaderMap();
+        HeaderMap headerMap = new HeaderMap();
 
-        new AuthorizationHeaderTokenProvider(emptyHeaderMap)                             //
-            .get()                                                                       //
-            .test()                                                                      //
-            .awaitDone(10, TimeUnit.SECONDS).assertError(NoAccessTokenException.class);  //
+        new AuthorizationHeaderTokenProvider(headerMap).get()                           //
+                                                       .test()                          //
+                                                       .awaitDone(10, TimeUnit.SECONDS) //
+                                                       .assertError(NoAccessTokenException.class);
     }
 
 }

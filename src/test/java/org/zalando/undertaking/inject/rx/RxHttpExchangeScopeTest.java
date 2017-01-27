@@ -34,11 +34,11 @@ public class RxHttpExchangeScopeTest extends HttpExchangeScopeInjectionTestBase 
 
     @Test
     public void throwsWithoutScopedExcutionObservable() {
-        getSimpleHandlerSingle().map(TestSimpleHandler::getHeaderMap)                     //
-                                .test()                                                   //
-                                .assertError(err ->                                       //
-                                    isExceptionWithCause(err, ProvisionException.class,   //
-                                                         OutOfScopeException.class));
+        getSimpleHandlerSingle().map(TestSimpleHandler::getHeaderMap) //
+                                .test()                               //
+                                .assertError(err ->                   //
+                                         isExceptionWithCause(err, ProvisionException.class, //
+                                            OutOfScopeException.class));
     }
 
     @Test
@@ -46,13 +46,13 @@ public class RxHttpExchangeScopeTest extends HttpExchangeScopeInjectionTestBase 
         HttpServerExchange demoExchange = new HttpServerExchange(null);
         demoExchange.getRequestHeaders().put(HttpString.tryFromString("X-Some-Header"), "blah");
 
-        Observable.just(1)                                                         //
-                  .lift(underTest.scoped(demoExchange))                            //
-                  .flatMap((e) -> getSimpleHandlerSingle().toObservable())         //
-                  .map(TestSimpleHandler::getHeaderMap)                            //
-                  .test()                                                          //
-                  .assertComplete()                                                //
-                  .assertValue(headers ->                                          //
+        Observable.just(1)                                                 //
+                  .lift(underTest.scoped(demoExchange))                    //
+                  .flatMap((e) -> getSimpleHandlerSingle().toObservable()) //
+                  .map(TestSimpleHandler::getHeaderMap)                    //
+                  .test()                                                  //
+                  .assertComplete()                                        //
+                  .assertValue(headers ->                                  //
                            headers.getFirst("X-Some-Header").equals("blah"));
 
     }
@@ -65,6 +65,7 @@ public class RxHttpExchangeScopeTest extends HttpExchangeScopeInjectionTestBase 
         Observable.error(new RuntimeException("trigger error")) //
                   .lift(underTest.scoped(demoExchange))         //
                   .onErrorResumeNext(throwable -> {             //
+
                       TestSimpleHandler testhandler =                                                        //
                           getNamedHandler(TestSimpleHandler.class, "testhandler", injector);                 //
                       return Observable.just(testhandler.getHeaderMap());                                    //
@@ -79,11 +80,11 @@ public class RxHttpExchangeScopeTest extends HttpExchangeScopeInjectionTestBase 
 
     @Test
     public void throwsWithoutScopedExcutionSingle() {
-        getSimpleHandlerSingle().map(TestSimpleHandler::getHeaderMap)                                //
-                                .test()                                                              //
-                                .assertError(err ->                                                  //
-                                                 isExceptionWithCause(err, ProvisionException.class, //
-                                                                      OutOfScopeException.class));
+        getSimpleHandlerSingle().map(TestSimpleHandler::getHeaderMap) //
+                                .test()                               //
+                                .assertError(err ->                   //
+                                         isExceptionWithCause(err, ProvisionException.class, //
+                                            OutOfScopeException.class));
     }
 
     @Test
@@ -91,13 +92,13 @@ public class RxHttpExchangeScopeTest extends HttpExchangeScopeInjectionTestBase 
         HttpServerExchange demoExchange = new HttpServerExchange(null);
         demoExchange.getRequestHeaders().put(HttpString.tryFromString("X-Some-Header"), "blah");
 
-        Single.just(1)                                              //
-              .lift(underTest.scopedSingle(demoExchange))               //
-              .flatMap((e) -> getSimpleHandlerSingle())             //
-              .map(TestSimpleHandler::getHeaderMap)                 //
-              .test()                                               //
-              .assertComplete()                                     //
-              .assertValue(headers ->                               //
+        Single.just(1)                                    //
+              .lift(underTest.scopedSingle(demoExchange)) //
+              .flatMap((e) -> getSimpleHandlerSingle())   //
+              .map(TestSimpleHandler::getHeaderMap)       //
+              .test()                                     //
+              .assertComplete()                           //
+              .assertValue(headers ->                     //
                        headers.getFirst("X-Some-Header").equals("blah"));
 
     }

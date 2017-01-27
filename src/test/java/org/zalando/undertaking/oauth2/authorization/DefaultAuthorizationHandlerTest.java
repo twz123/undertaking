@@ -76,7 +76,7 @@ public class DefaultAuthorizationHandlerTest {
         when(authPredicate.test(authInfo)).thenReturn(true);
 
         final HttpServerExchange exchange = new HttpServerExchange(null);
-        doAnswer(invocation -> exchange.dispatch()).when(next).handleRequest(exchange);
+        doAnswer(invocation -> exchange).when(next).handleRequest(exchange);
 
         underTest.require(authPredicate, next).handleRequest(exchange);
 
@@ -93,7 +93,7 @@ public class DefaultAuthorizationHandlerTest {
         final HttpServerExchange exchange = new HttpServerExchange(null);
 
         final HttpHandler forbidden = mock(HttpHandler.class);
-        doAnswer(invocation -> exchange.dispatch()).when(forbidden).handleRequest(exchange);
+        doAnswer(invocation -> exchange).when(forbidden).handleRequest(exchange);
         doAnswer(invocation -> forbidden).when(underTest).forbidden(same(authInfo), any());
 
         underTest.require(authPredicate, next).handleRequest(exchange);
@@ -115,7 +115,7 @@ public class DefaultAuthorizationHandlerTest {
         final HttpServerExchange exchange = new HttpServerExchange(null);
         exchange.getRequestHeaders().put(new HttpString("BP-Override"), "Someone Else");
 
-        doAnswer(invocation -> exchange.dispatch()).when(next).handleRequest(exchange);
+        doAnswer(invocation -> exchange).when(next).handleRequest(exchange);
 
         underTest.require(authPredicate, next).handleRequest(exchange);
 
@@ -132,7 +132,7 @@ public class DefaultAuthorizationHandlerTest {
 
         final HttpServerExchange exchange = new HttpServerExchange(null);
 
-        doAnswer(invocation -> exchange.dispatch()).when(next).handleRequest(exchange);
+        doAnswer(invocation -> exchange).when(next).handleRequest(exchange);
 
         underTest.require(authPredicate, next).handleRequest(exchange);
 
@@ -151,7 +151,7 @@ public class DefaultAuthorizationHandlerTest {
         exchange.getRequestHeaders().put(new HttpString("BP-Override"), "Someone Else");
 
         final HttpHandler forbidden = mock(HttpHandler.class);
-        doAnswer(invocation -> exchange.dispatch()).when(forbidden).handleRequest(exchange);
+        doAnswer(invocation -> exchange).when(forbidden).handleRequest(exchange);
         doAnswer(invocation -> forbidden).when(underTest).forbidden(same(authInfo), any());
 
         underTest.require(authPredicate, next).handleRequest(exchange);
@@ -169,7 +169,7 @@ public class DefaultAuthorizationHandlerTest {
         exchange.getRequestHeaders().put(new HttpString("BP-Override"), "Someone Else");
 
         final HttpHandler forbidden = mock(HttpHandler.class);
-        doAnswer(invocation -> exchange.dispatch()).when(forbidden).handleRequest(exchange);
+        doAnswer(invocation -> exchange).when(forbidden).handleRequest(exchange);
         doAnswer(invocation -> forbidden).when(underTest).forbidden(same(authInfo), any());
 
         underTest.require(authPredicate, next).handleRequest(exchange);

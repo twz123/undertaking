@@ -42,14 +42,6 @@ public final class AccessToken {
         }
     }
 
-    /**
-     * @deprecated  Use {@code #bearer(String)} instead.
-     */
-    @Deprecated
-    public static AccessToken of(final String value) {
-        return bearer(value);
-    }
-
     public static AccessToken typeless(final String value) {
         return new AccessToken(Optional.empty(), value);
     }

@@ -46,12 +46,13 @@ class TokenInfoRequestProvider extends OAuth2RequestProvider {
         super(client);
         this.settings = requireNonNull(settings);
 
-        CircuitBreakerConfig config =                                                               //
-            CircuitBreakerConfig.custom()                                                           //
-                                .recordFailure(e -> Match(e).of(                                    //
-                                    Case(instanceOf(BadAccessTokenException.class), false),         //
-                                    Case(instanceOf(TokenInfoRequestException.class), false),       //
-                                    Case($(), true))).build();                                      //
+        CircuitBreakerConfig config =                                             //
+            CircuitBreakerConfig.custom()                                         //
+                                .recordFailure(e ->
+                                        Match(e).of(                              //
+                                            Case(instanceOf(BadAccessTokenException.class), false), //
+                                            Case(instanceOf(TokenInfoRequestException.class), false), //
+                                            Case($(), true))).build();            //
         this.circuitBreaker = circuitBreakerRegistry.circuitBreaker("auth/accessToken", config);
     }
 
@@ -62,9 +63,12 @@ class TokenInfoRequestProvider extends OAuth2RequestProvider {
     public Single<AuthenticationInfo> getTokenInfo(final AccessToken accessToken, final HeaderMap requestHeaders) {
 
         return this.construct(buildRequest(accessToken), requestHeaders).timeout(10_000, TimeUnit.MILLISECONDS) //
-                   .retry(maxRetriesOr(3, e -> Match(e).of(                                                     //
-                       Case(instanceOf(BadAccessTokenException.class), false),                                  //
-                       Case(instanceOf(TokenInfoRequestException.class), false), Case($(), true))))             //
+                   .retry(maxRetriesOr(3,
+                           e ->
+                               Match(e).of(                                                                     //
+                                   Case(instanceOf(BadAccessTokenException.class), false),                      //
+                                   Case(instanceOf(TokenInfoRequestException.class), false),                    //
+                                   Case($(), true))))                                                           //
                    .lift(CircuitBreakerOperator.of(circuitBreaker));                                            //
     }
 

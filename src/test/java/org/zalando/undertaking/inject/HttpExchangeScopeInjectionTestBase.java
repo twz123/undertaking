@@ -26,8 +26,7 @@ public class HttpExchangeScopeInjectionTestBase {
     }
 
     protected Injector getInjector() {
-        Consumer subModule = (Consumer<PrivateBinder>) binder -> {
-
+        Consumer<PrivateBinder> subModule = binder -> {
             binder.bind(HttpHandler.class)                   //
                   .annotatedWith(Names.named("testhandler")) //
                   .to(TestSimpleHandler.class)               //
