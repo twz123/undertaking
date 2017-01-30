@@ -56,12 +56,14 @@ class AccessTokenRequestProvider extends OAuth2RequestProvider {
         this.settings = requireNonNull(settings);
         this.clock = requireNonNull(clock);
 
+        //J-
         CircuitBreakerConfig config =
             CircuitBreakerConfig
                 .custom().recordFailure(e -> Match(e).of(
                     Case(instanceOf(BadAccessTokenException.class), false),
                     Case($(), true)))
                 .build();
+        //J+
         this.circuitBreaker = circuitBreakerRegistry.circuitBreaker("auth/accessToken", config);
     }
 
@@ -83,6 +85,7 @@ class AccessTokenRequestProvider extends OAuth2RequestProvider {
     public Single<AccessTokenResponse> requestAccessToken(final RequestCredentials credentials) {
         final Single<Instant> requestTimeProvider = Single.fromCallable(clock::instant);
 
+        //J-
         return createRequest(createRequestBuilder(credentials))                                //
                 .map(AccessTokenRequestProvider.this::parsePayload)                            //
                 .zipWith(requestTimeProvider, this::buildResponse)                             //
@@ -91,6 +94,7 @@ class AccessTokenRequestProvider extends OAuth2RequestProvider {
                                 Case($(), true))))                                             //
                 .timeout(10_000, TimeUnit.MILLISECONDS, Single.error(new TimeoutException()))  //
                 .lift(CircuitBreakerOperator.of(circuitBreaker));                              //
+        //J+
     }
 
     @VisibleForTesting

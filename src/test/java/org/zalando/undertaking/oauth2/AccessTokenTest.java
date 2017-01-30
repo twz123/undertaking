@@ -21,7 +21,7 @@ public class AccessTokenTest {
     public void testValidToken() {
         AccessToken validToken = AccessToken.parse("Bearer " + TEST_TOKEN_VALUE);
 
-        assertThat(validToken, equalTo(AccessToken.of(TEST_TOKEN_VALUE)));
+        assertThat(validToken, equalTo(AccessToken.bearer(TEST_TOKEN_VALUE)));
         assertThat(validToken.hasType(), is(true));
         assertThat(validToken.isOfType("Bearer"), is(true));
         assertThat(validToken.getTypeAndValue(), equalTo("Bearer " + TEST_TOKEN_VALUE));
