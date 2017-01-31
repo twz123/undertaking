@@ -46,11 +46,4 @@ public class SimpleHttpMetricsModule extends PrivateModule {
     Timer provideTimer() {
         return new Timer(new SlidingTimeWindowReservoir(1, TimeUnit.MINUTES));
     }
-
-    @Provides
-    @Exposed
-    @Singleton
-    CircuitBreakerRegistry provideCircuitBreakerRegistry(final MetricRegistry registry) {
-        return new MetricsPublishingCircuitBreakerRegistry(CircuitBreakerRegistry.ofDefaults(), registry);
-    }
 }
