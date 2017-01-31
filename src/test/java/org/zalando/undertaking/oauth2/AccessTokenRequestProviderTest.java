@@ -12,9 +12,6 @@ import static org.hobsoft.hamcrest.compose.ComposeMatchers.hasFeatureValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 
-import static org.mockito.Mockito.doCallRealMethod;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -49,6 +46,7 @@ import org.mockito.Mock;
 
 import org.mockito.runners.MockitoJUnitRunner;
 
+import org.zalando.undertaking.ahc.GuardedHttpClient;
 import org.zalando.undertaking.oauth2.credentials.ClientCredentials;
 import org.zalando.undertaking.oauth2.credentials.RequestCredentials;
 import org.zalando.undertaking.oauth2.credentials.UserCredentials;
@@ -82,30 +80,31 @@ public class AccessTokenRequestProviderTest {
     @Mock
     private Clock clock;
 
-    private AccessTokenRequestProvider underTest;
-
     @Mock
     private BoundRequestBuilder requestBuilder;
 
-    private Single<Response> requestSingle;
-
     @Mock
     private Response response;
+
+    private Single<Response> requestSingle;
+
+    private AccessTokenRequestProvider underTest;
 
     @Captor
     private ArgumentCaptor<List<Param>> formParamCaptor;
 
     @Before
     public void initializeTest() {
-        this.underTest = spy(new AccessTokenRequestProvider(settings, client, clock,
-                    CircuitBreakerRegistry.ofDefaults()));
+        GuardedHttpClient guardedHttpClient = new GuardedHttpClient(CircuitBreakerRegistry.ofDefaults(),
+                (e) -> requestSingle);
+
+        this.underTest = new AccessTokenRequestProvider(settings, client, clock, guardedHttpClient);
 
         credentials = new RequestCredentials(new ClientCredentials("clientId", "clientSecret"),
                 new UserCredentials("user", "pass"));
 
         when(settings.getAccessTokenEndpoint()).thenReturn(URI.create("foo"));
         when(client.preparePost(any())).thenReturn(requestBuilder);
-        doReturn(Single.defer(() -> requestSingle)).when(underTest).createRequest(any());
 
         when(requestBuilder.setRealm(any(Realm.class))).thenReturn(requestBuilder);
         when(requestBuilder.setHeader(any(), anyString())).thenReturn(requestBuilder);
@@ -119,12 +118,6 @@ public class AccessTokenRequestProviderTest {
     }
 
     @Test
-    public void fullCoverage4TW() {
-        doCallRealMethod().when(underTest).createRequest(any());
-        underTest.createRequest(requestBuilder);
-    }
-
-    @Test
     public void extractsToken() {
         when(response.getStatusCode()).thenReturn(200);
         when(response.getResponseBody()).thenReturn("{access_token:foo, expires_in:5}");
@@ -134,12 +127,10 @@ public class AccessTokenRequestProviderTest {
         final Single<AccessTokenResponse> requestSingle = underTest.requestAccessToken(credentials);
 
         final AccessTokenResponse first = requestSingle.blockingGet();
-        verify(underTest).createRequest(any());
         assertThat(first.getAccessToken(), hasProperty("value", is("foo")));
         assertThat(first.getExpiryTime(), is(Instant.ofEpochSecond(5)));
 
         final AccessTokenResponse second = requestSingle.blockingGet();
-        verify(underTest).createRequest(any());
         assertThat(second.getAccessToken(), hasProperty("value", is("foo")));
         assertThat(second.getExpiryTime(), is(Instant.ofEpochSecond(65)));
     }
@@ -251,7 +242,6 @@ public class AccessTokenRequestProviderTest {
         TestScheduler testScheduler = new TestScheduler();
         RxJavaPlugins.setComputationSchedulerHandler((s) -> testScheduler);
 
-        when(clock.instant()).thenReturn(Instant.ofEpochSecond(0));
         requestSingle = Single.never();
 
         TestObserver<AccessTokenResponse> testObserver = underTest.requestAccessToken(credentials).test();
@@ -263,6 +253,7 @@ public class AccessTokenRequestProviderTest {
 
     @Test
     public void usesSpaceAsScopeSeparator() throws InterruptedException {
+        requestSingle = Single.just(response);
         when(settings.getAccessTokenScopes()).thenReturn(ImmutableSet.of("scope1", "scope2"));
 
         underTest.requestAccessToken(credentials).test().await();

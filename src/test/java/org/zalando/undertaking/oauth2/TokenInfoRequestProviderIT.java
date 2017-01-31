@@ -27,6 +27,8 @@ import java.util.Collections;
 import org.asynchttpclient.AsyncHttpClient;
 import org.asynchttpclient.DefaultAsyncHttpClient;
 
+import org.asynchttpclient.extras.rxjava2.single.AsyncHttpSingle;
+
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -45,6 +47,8 @@ import org.mockserver.client.server.MockServerClient;
 import org.mockserver.junit.MockServerRule;
 
 import org.mockserver.matchers.Times;
+
+import org.zalando.undertaking.ahc.GuardedHttpClient;
 
 import com.google.common.collect.ImmutableMap;
 
@@ -88,7 +92,10 @@ public class TokenInfoRequestProviderIT {
                 "http://localhost:" + serverRule.getPort() + "/tokeninfo"));
         when(settings.getBusinessPartnerIdOverrideHeader()).thenReturn("X-Business-Partner-Id");
 
-        underTest = new TokenInfoRequestProvider(settings, httpClient, CircuitBreakerRegistry.ofDefaults());
+        GuardedHttpClient guardedHttpClient = new GuardedHttpClient(CircuitBreakerRegistry.ofDefaults(),
+                AsyncHttpSingle::create);
+
+        underTest = new TokenInfoRequestProvider(settings, httpClient, guardedHttpClient);
     }
 
     @After
@@ -139,7 +146,7 @@ public class TokenInfoRequestProviderIT {
                                         "error", "invalid_request",               //
                                         "error_description", "Access Token not valid"))));
 
-        expected.expect(allOf(                                                       //
+        expected.expectCause(allOf(                                                  //
                 instanceOf(BadTokenInfoException.class),                             //
                 hasProperty("error", is("invalid_token")),                           //
                 hasProperty("errorDescription", hasValue("Access Token not valid"))) //

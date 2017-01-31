@@ -4,10 +4,7 @@ import static java.time.temporal.ChronoUnit.DAYS;
 
 import static org.mockito.ArgumentMatchers.any;
 
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 import java.net.ConnectException;
 
@@ -48,7 +45,6 @@ public class AccessTokenProviderTest {
     private final Single<RequestCredentials> requestCredentials = Single.just(new RequestCredentials(
                 new ClientCredentials(), new UserCredentials()));
 
-    @Mock
     private AccessTokenRequestProvider requestProvider;
 
     @Mock
@@ -62,6 +58,7 @@ public class AccessTokenProviderTest {
 
     @Before
     public void setUp() {
+        requestProvider = mock(AccessTokenRequestProvider.class);
         when(settings.getRefreshTokenPercentage()).thenReturn(100);
         when(clock.instant()).thenReturn(Instant.EPOCH);
 

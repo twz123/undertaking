@@ -4,67 +4,56 @@ import static java.util.Objects.requireNonNull;
 
 import static com.google.common.base.MoreObjects.firstNonNull;
 
-import static javaslang.API.*;
-
-import static javaslang.Predicates.instanceOf;
-
 import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 
 import java.util.List;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import java.util.function.Predicate;
 
 import javax.inject.Inject;
 
 import org.asynchttpclient.*;
 
-import org.asynchttpclient.extras.rxjava2.single.AsyncHttpSingle;
-
+import org.zalando.undertaking.ahc.ClientConfig;
+import org.zalando.undertaking.ahc.GuardedHttpClient;
 import org.zalando.undertaking.oauth2.credentials.ClientCredentials;
 import org.zalando.undertaking.oauth2.credentials.RequestCredentials;
 import org.zalando.undertaking.oauth2.credentials.UserCredentials;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.net.HttpHeaders;
 
-import io.github.robwin.circuitbreaker.CircuitBreaker;
-import io.github.robwin.circuitbreaker.CircuitBreakerConfig;
-import io.github.robwin.circuitbreaker.CircuitBreakerRegistry;
-import io.github.robwin.circuitbreaker.operator.CircuitBreakerOperator;
-
 import io.reactivex.Single;
-
-import io.reactivex.functions.BiPredicate;
 
 import io.undertow.util.StatusCodes;
 
 class AccessTokenRequestProvider extends OAuth2RequestProvider {
-
     private final Clock clock;
-    private final CircuitBreaker circuitBreaker;
     private final AccessTokenSettings settings;
+
+    private final ClientConfig requestConfig = ClientConfig.builder().circuitBreakerName("auth/accessToken")
+                                                           .maxRetries(3)
+                                                           .circuitBreakerIgnoreFailures(ImmutableSet.of(
+                                                                   BadAccessTokenException.class))
+                                                           .nonRetryableExceptions(ImmutableSet.of(
+                BadAccessTokenException.class)).timeOutMs(10_000).build();
+
+    private final GuardedHttpClient guardedHttpClient;
 
     @Inject
     public AccessTokenRequestProvider(final AccessTokenSettings settings, final AsyncHttpClient client,
-            final Clock clock, final CircuitBreakerRegistry circuitBreakerRegistry) {
+            final Clock clock, final GuardedHttpClient guardedHttpClient) {
+
         super(client);
         this.settings = requireNonNull(settings);
         this.clock = requireNonNull(clock);
+        this.guardedHttpClient = requireNonNull(guardedHttpClient);
+    }
 
-        //J-
-        CircuitBreakerConfig config =
-            CircuitBreakerConfig
-                .custom().recordFailure(e -> Match(e).of(
-                    Case(instanceOf(BadAccessTokenException.class), false),
-                    Case($(), true)))
-                .build();
-        //J+
-        this.circuitBreaker = circuitBreakerRegistry.circuitBreaker("auth/accessToken", config);
+    public Single<AccessTokenResponse> requestAccessToken(final RequestCredentials credentials) {
+        return guardedHttpClient.executeRequest(createRequestBuilder(credentials), this::handleResponse, requestConfig);
     }
 
     private static Realm createRealm(final ClientCredentials credentials) {
@@ -82,25 +71,8 @@ class AccessTokenRequestProvider extends OAuth2RequestProvider {
                       .setFormParams(createFormParams(credentials.getUserCredentials()));
     }
 
-    public Single<AccessTokenResponse> requestAccessToken(final RequestCredentials credentials) {
-        final Single<Instant> requestTimeProvider = Single.fromCallable(clock::instant);
-
-        //J-
-        return createRequest(createRequestBuilder(credentials))                                //
-                .map(AccessTokenRequestProvider.this::parsePayload)                            //
-                .zipWith(requestTimeProvider, this::buildResponse)                             //
-                .retry(maxRetriesOr(3,  e -> Match(e).of(                                      //
-                                Case(instanceOf(BadAccessTokenException.class), false),        //
-                                Case($(), true))))                                             //
-                .timeout(10_000, TimeUnit.MILLISECONDS, Single.error(new TimeoutException()))  //
-                .lift(CircuitBreakerOperator.of(circuitBreaker));                              //
-        //J+
-    }
-
-    @VisibleForTesting
-    @SuppressWarnings("static-method")
-    Single<Response> createRequest(final BoundRequestBuilder requestBuilder) {
-        return AsyncHttpSingle.create(requestBuilder);
+    private AccessTokenResponse handleResponse(final Response response) {
+        return buildResponse(parsePayload(response), clock.instant());
     }
 
     private Payload parsePayload(final Response response) {
@@ -149,10 +121,6 @@ class AccessTokenRequestProvider extends OAuth2RequestProvider {
                 new Param("username", credentials.getApplicationUsername()),
                 new Param("password", credentials.getApplicationPassword()),
                 new Param("scope", Joiner.on(' ').join(settings.getAccessTokenScopes())));
-    }
-
-    private BiPredicate<Integer, Throwable> maxRetriesOr(final int maxRetries, final Predicate<Throwable> pred) {
-        return (tries, ex) -> tries < maxRetries && pred.test(ex);
     }
 
     private static final class Payload {
