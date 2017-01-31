@@ -23,7 +23,7 @@ import org.junit.runner.RunWith;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.MockitoJUnitRunner;
 
 import org.zalando.undertaking.inject.HttpExchangeScope;
 import org.zalando.undertaking.oauth2.AuthenticationInfo;

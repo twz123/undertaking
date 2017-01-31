@@ -44,7 +44,7 @@ import org.mockito.ArgumentMatchers;
 import org.mockito.Captor;
 import org.mockito.Mock;
 
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.MockitoJUnitRunner;
 
 import org.zalando.undertaking.ahc.GuardedHttpClient;
 import org.zalando.undertaking.oauth2.credentials.ClientCredentials;
