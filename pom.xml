@@ -104,6 +104,13 @@
             <optional>true</optional>
         </dependency>
 
+        <!-- Configuration via owner -->
+        <dependency>
+            <groupId>org.aeonbits.owner</groupId>
+            <artifactId>owner</artifactId>
+            <version>1.0.9</version>
+        </dependency>
+
         <!-- HTTP metrics via Dropwizard Metrics -->
         <dependency>
             <groupId>io.dropwizard.metrics</groupId>
@@ -220,6 +227,14 @@
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-simple</artifactId>
             <version>${slf4j.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Set known environment variables in tests. -->
+        <dependency>
+            <groupId>com.github.stefanbirkner</groupId>
+            <artifactId>system-rules</artifactId>
+            <version>1.16.0</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
