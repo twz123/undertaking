@@ -38,7 +38,7 @@ class AccessTokenRequestProvider extends OAuth2RequestProvider {
                                                            .circuitBreakerIgnoreFailures(ImmutableSet.of(
                                                                    BadAccessTokenException.class))
                                                            .nonRetryableExceptions(ImmutableSet.of(
-                BadAccessTokenException.class)).timeOutMs(10_000).build();
+                BadAccessTokenException.class)).timeOutMs(10_000L).build();
 
     private final GuardedHttpClient guardedHttpClient;
 

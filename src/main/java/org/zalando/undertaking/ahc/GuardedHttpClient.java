@@ -20,6 +20,11 @@ import io.reactivex.Single;
 
 import io.reactivex.functions.BiPredicate;
 
+/**
+ * Helper class to create Http Requests guarded by a retry handler and a circuit breaker.
+ *
+ * @see  ClientConfig
+ */
 public class GuardedHttpClient {
     private CircuitBreakerRegistry circuitBreakerRegistry;
     private Function<BoundRequestBuilder, Single<Response>> requestCreator;
@@ -38,7 +43,7 @@ public class GuardedHttpClient {
         return requestCreator.apply(builder)
             .map(responseHandler::apply)
             .retry(maxRetriesOr(config.getMaxRetries(), exceptionIsNotOfType(config.getNonRetryableExceptions())))
-            .timeout(config.getTimeoutMs(), TimeUnit.MILLISECONDS, Single.error(new TimeoutException()))
+            .timeout(config.getTimeoutMillis(), TimeUnit.MILLISECONDS, Single.error(new TimeoutException()))
             .lift(CircuitBreakerOperator.of(circuitBreaker));
         //J+
     }

@@ -31,7 +31,7 @@ class TokenInfoRequestProvider extends OAuth2RequestProvider {
                                                            .circuitBreakerIgnoreFailures(ImmutableSet.of(
                                                                    BadAccessTokenException.class))
                                                            .nonRetryableExceptions(ImmutableSet.of(
-                BadAccessTokenException.class)).timeOutMs(10_000).build();
+                BadAccessTokenException.class)).timeOutMs(10_000L).build();
 
     @Inject
     public TokenInfoRequestProvider(final AuthenticationInfoSettings settings, final AsyncHttpClient client,

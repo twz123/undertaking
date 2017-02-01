@@ -96,7 +96,7 @@ public class GuardedHttpClientTest {
 
         single = spy(Single.never());
 
-        ClientConfig config = defaultBuilder.maxRetries(5).timeOutMs(5000)
+        ClientConfig config = defaultBuilder.maxRetries(5).timeOutMs(5000L)
                                             .nonRetryableExceptions(ImmutableSet.of(TimeoutException.class)).build();
 
         testScheduler.triggerActions();
@@ -147,11 +147,6 @@ public class GuardedHttpClientTest {
 
     private Function<Response, String> staticMessage() {
         return (r) -> "completed";
-    }
-
-    private Single<Response> mockHttpResponse(Single<Response> single) {
-        single = spy(single);
-        return single;
     }
 
     @SuppressWarnings("unchecked")
