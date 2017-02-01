@@ -21,7 +21,7 @@ import io.reactivex.Single;
 import io.reactivex.functions.BiPredicate;
 
 /**
- * Helper class to create Http Requests guarded by a retry handler and a circuit breaker.
+ * Helper class to create HTTP Requests guarded by a retry handler and a circuit breaker.
  *
  * @see  ClientConfig
  */

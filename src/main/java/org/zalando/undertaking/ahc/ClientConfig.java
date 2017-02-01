@@ -1,5 +1,7 @@
 package org.zalando.undertaking.ahc;
 
+import com.google.common.base.Preconditions;
+
 import static java.util.Objects.requireNonNull;
 
 import java.util.Collections;
@@ -8,12 +10,12 @@ import java.util.Set;
 public class ClientConfig {
     private final Set<Class<? extends Throwable>> nonRetryableExceptions;
     private final Set<Class<? extends Throwable>> circuitBreakerIgnoreFailure;
-    private final Long timeoutMillis;
-    private final Integer maxRetries;
+    private final long timeoutMillis;
+    private final int maxRetries;
     private final String circuitBreakerName;
 
     private ClientConfig(final Set<Class<? extends Throwable>> nonRetryableExceptions,
-            final Set<Class<? extends Throwable>> circuitBreakerIgnoreFailure, final Long timeoutMillis,
+            final Set<Class<? extends Throwable>> circuitBreakerIgnoreFailure, final long timeoutMillis,
             final int maxRetries, final String circuitBreakerName) {
         this.nonRetryableExceptions = nonRetryableExceptions;
         this.circuitBreakerIgnoreFailure = circuitBreakerIgnoreFailure;
@@ -34,7 +36,7 @@ public class ClientConfig {
         return circuitBreakerIgnoreFailure;
     }
 
-    public Long getTimeoutMillis() {
+    public long getTimeoutMillis() {
         return timeoutMillis;
     }
 
@@ -47,22 +49,21 @@ public class ClientConfig {
     }
 
     public static class Builder {
-        private Long timeoutMillis = 2000L;
-        private Integer maxRetries = 1;
+        private long timeoutMillis = 2000L;
+        private int maxRetries = 1;
         private String circuitBreakerName = "unnamed";
         private Set<Class<? extends Throwable>> circuitBreakerIgnoreFailures = Collections.emptySet();
         private Set<Class<? extends Throwable>> nonRetryableExceptions = Collections.emptySet();
 
         private Builder() { }
 
-        public Builder timeOutMs(final Long timeoutMillis) {
-            requireNonNull(timeoutMillis);
+        public Builder timeOutMs(final long timeoutMillis) {
+            Preconditions.checkArgument(timeoutMillis > 0, "timeoutMillis expected to be greater than 0");
             this.timeoutMillis = timeoutMillis;
             return this;
         }
 
-        public Builder maxRetries(final Integer maxRetries) {
-            requireNonNull(maxRetries);
+        public Builder maxRetries(final int maxRetries) {
             this.maxRetries = maxRetries;
             return this;
         }
