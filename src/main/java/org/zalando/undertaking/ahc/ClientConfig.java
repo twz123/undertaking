@@ -2,6 +2,7 @@ package org.zalando.undertaking.ahc;
 
 import com.google.common.base.Preconditions;
 
+import static com.google.common.base.Preconditions.*;
 import static java.util.Objects.requireNonNull;
 
 import java.util.Collections;
@@ -58,7 +59,7 @@ public class ClientConfig {
         private Builder() { }
 
         public Builder timeOutMs(final long timeoutMillis) {
-            Preconditions.checkArgument(timeoutMillis > 0, "timeoutMillis expected to be greater than 0");
+            checkArgument(timeoutMillis > 0, "timeoutMillis expected to be greater than 0");
             this.timeoutMillis = timeoutMillis;
             return this;
         }
