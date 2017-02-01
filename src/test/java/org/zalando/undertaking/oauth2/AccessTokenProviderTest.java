@@ -4,10 +4,7 @@ import static java.time.temporal.ChronoUnit.DAYS;
 
 import static org.mockito.ArgumentMatchers.any;
 
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 import java.net.ConnectException;
 
@@ -25,7 +22,7 @@ import org.junit.runner.RunWith;
 
 import org.mockito.Mock;
 
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.MockitoJUnitRunner;
 
 import org.zalando.undertaking.oauth2.credentials.ClientCredentials;
 import org.zalando.undertaking.oauth2.credentials.RequestCredentials;

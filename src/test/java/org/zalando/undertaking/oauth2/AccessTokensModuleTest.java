@@ -33,8 +33,9 @@ import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.Spy;
 
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.MockitoJUnitRunner;
 
+import org.zalando.undertaking.ahc.GuardedHttpClient;
 import org.zalando.undertaking.oauth2.credentials.CredentialsSettings;
 
 import com.google.inject.AbstractModule;
@@ -56,6 +57,9 @@ public class AccessTokensModuleTest {
 
     @Mock
     private AsyncHttpClient asyncHttpClient;
+
+    @Mock
+    private GuardedHttpClient guardedHttpClient;
 
     @Spy
     private AccessTokensModule underTest;
@@ -116,6 +120,7 @@ public class AccessTokensModuleTest {
                         bind(AccessTokenSettings.class).toInstance(accessTokenSettings);
                         bind(AsyncHttpClient.class).toInstance(asyncHttpClient);
                         bind(CircuitBreakerRegistry.class).toInstance(CircuitBreakerRegistry.ofDefaults());
+                        bind(GuardedHttpClient.class).toInstance(guardedHttpClient);
                     }
                 }, underTest);
     }
