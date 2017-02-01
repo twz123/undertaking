@@ -28,6 +28,9 @@ The LogbookHandler expects an obfuscation function of type `Function<String, Str
 to be injected with the name `logbook.pathObfuscator`. This function prevents confidential path parameters in the URI to be 
 logged as plain text.
 
+###  Usage of OAuth2-related functionality
+In order to safely call OAuth2 providers, this library makes use of the Circuit Breaker library [javaslang-circuitbreaker]. Users
+of this library are expected to bind an instance to `CircuitBreakerRegistry`, which will be used to instantiate circuit breakers.
 
 ## License
 
@@ -52,3 +55,5 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+[javaslang-circuitbreaker]: https://github.com/RobWin/javaslang-circuitbreaker
