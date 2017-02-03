@@ -110,6 +110,11 @@
             <artifactId>owner</artifactId>
             <version>1.0.9</version>
         </dependency>
+        <dependency>
+            <groupId>org.aeonbits.owner</groupId>
+            <artifactId>owner-java8</artifactId>
+            <version>1.0.9</version>
+        </dependency>
 
         <!-- HTTP metrics via Dropwizard Metrics -->
         <dependency>
