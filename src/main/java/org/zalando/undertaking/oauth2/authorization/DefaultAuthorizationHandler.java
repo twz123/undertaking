@@ -34,7 +34,6 @@ import io.reactivex.Single;
 
 import io.undertow.Handlers;
 
-import io.undertow.server.Connectors;
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
 
@@ -133,11 +132,11 @@ public class DefaultAuthorizationHandler implements AuthorizationHandler {
                     LOG.trace("Executing for request [{}]: [{}]", requestId, handler);
                 }
 
-                Connectors.executeRootHandler(scope.scoped(handler), exchange);
+                exchange.dispatch(scope.scoped(handler));
             },
             error -> {
                 if (requestId != null) {
-                    LOG.trace("Fatal error occured while processing request [{}]: [{}]", requestId, error);
+                    LOG.error("Fatal error occured while processing request [{}]: [{}]", requestId, error);
                 }
 
                 if (!exchange.isResponseStarted()) {
