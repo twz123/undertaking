@@ -41,14 +41,10 @@ class TokenInfoRequestProvider extends OAuth2RequestProvider {
         this.guardedHttpClient = requireNonNull(guardedHttpClient);
     }
 
-    private static <T> Single<T> mapError(final Throwable error) {
-        return Single.error(new TokenInfoRequestException(error.getMessage(), error));
-    }
-
     public Single<AuthenticationInfo> getTokenInfo(final AccessToken accessToken, final HeaderMap requestHeaders) {
         return guardedHttpClient.executeRequest(buildRequest(accessToken),
-                                    response -> parseResponse(response, requestHeaders),
-                                    requestConfig).onErrorResumeNext(TokenInfoRequestProvider::mapError);
+            response -> parseResponse(response, requestHeaders),
+            requestConfig);
     }
 
     private BoundRequestBuilder buildRequest(final AccessToken accessToken) {
